@@ -21,11 +21,11 @@ import com.fsck.k9.activity.loader.AttachmentContentLoader;
 import com.fsck.k9.activity.loader.AttachmentInfoLoader;
 import com.fsck.k9.activity.misc.Attachment;
 import com.fsck.k9.activity.misc.Attachment.LoadingState;
+import com.fsck.k9.mail.FancyPart;
 import com.fsck.k9.mail.Flag;
 import com.fsck.k9.mail.MessagingException;
 import com.fsck.k9.mail.Multipart;
 import com.fsck.k9.mail.Part;
-import com.fsck.k9.mail.internet.MimeUtility;
 import com.fsck.k9.mailstore.AttachmentViewInfo;
 import com.fsck.k9.mailstore.LocalBodyPart;
 import com.fsck.k9.mailstore.MessageViewInfo;
@@ -323,8 +323,8 @@ public class AttachmentPresenter {
             return ret;
         }
 
-        String contentType = part.getContentType();
-        String name = MimeUtility.getHeaderParameter(contentType, "name");
+        FancyPart fancyPart = FancyPart.from(part);
+        String name = fancyPart.getPartName();
         if (name != null) {
             if (part instanceof LocalBodyPart) {
                 LocalBodyPart localBodyPart = (LocalBodyPart) part;
