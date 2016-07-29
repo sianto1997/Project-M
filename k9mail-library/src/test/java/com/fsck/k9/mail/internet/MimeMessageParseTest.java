@@ -60,7 +60,7 @@ public class MimeMessageParseTest {
                         "To: <eva@example.org>\r\n" +
                         "Subject: Testmail\r\n" +
                         "MIME-Version: 1.0\r\n" +
-                        "Content-type: text/plain; encoding=ISO-8859-1\r\n" +
+                        "Content-type: text/plain; charset=ISO-8859-1\r\n" +
                         "Content-Transfer-Encoding: 8bit\r\n" +
                         "\r\n" +
                         "gefährliche Umlaute"));
@@ -68,7 +68,8 @@ public class MimeMessageParseTest {
         checkAddresses(msg.getFrom(), "adam@example.org");
         checkAddresses(msg.getRecipients(RecipientType.TO), "eva@example.org");
         assertEquals("Testmail", msg.getSubject());
-        assertEquals("text/plain; encoding=ISO-8859-1", FancyPart.from(msg).getMimeType());
+        assertEquals("text/plain", FancyPart.from(msg).getMimeType());
+        assertEquals("ISO-8859-1", FancyPart.from(msg).getCharset());
         assertEquals("gefährliche Umlaute", streamToString(MimeUtility.decodeBody(msg.getBody())));
     }
 
