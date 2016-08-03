@@ -16,7 +16,7 @@ import static junit.framework.Assert.assertEquals;
 
 
 @RunWith(RobolectricTestRunner.class)
-@Config(manifest = Config.NONE)
+@Config(manifest = Config.NONE, sdk = 21)
 public class HtmlConverterTest {
     // Useful if you want to write stuff to a file for debugging in a browser.
     private static final boolean WRITE_TO_FILE = Boolean.parseBoolean(System.getProperty("k9.htmlConverterTest.writeToFile", "false"));
@@ -142,10 +142,10 @@ public class HtmlConverterTest {
         FileWriter fstream = null;
 
         try {
-            System.err.println(content);
-
             File f = new File(OUTPUT_FILE);
-            f.delete();
+            if (f.exists() && !f.delete()) {
+                throw new RuntimeException("Unable to delete existing output");
+            }
 
             fstream = new FileWriter(OUTPUT_FILE);
             BufferedWriter out = new BufferedWriter(fstream);

@@ -76,11 +76,16 @@ public class MessagingControllerPushReceiver implements PushReceiver {
     public void pushError(String errorMessage, Exception e) {
         String errMess = errorMessage;
 
-        controller.notifyUserIfCertificateProblem(context, e, account, true);
+        controller.notifyUserIfCertificateProblem(account, e, true);
         if (errMess == null && e != null) {
             errMess = e.getMessage();
         }
         controller.addErrorMessage(account, errMess, e);
+    }
+
+    @Override
+    public void authenticationFailed() {
+        controller.handleAuthenticationFailure(account, true);
     }
 
     public String getPushState(String folderName) {

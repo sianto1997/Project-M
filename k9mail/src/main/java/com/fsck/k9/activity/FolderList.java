@@ -6,6 +6,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 
+import android.annotation.SuppressLint;
 import android.app.ActionBar;
 import android.content.Context;
 import android.content.Intent;
@@ -45,6 +46,7 @@ import com.fsck.k9.FontSizes;
 import com.fsck.k9.K9;
 import com.fsck.k9.Preferences;
 import com.fsck.k9.R;
+import com.fsck.k9.activity.compose.MessageActions;
 import com.fsck.k9.activity.setup.AccountSettings;
 import com.fsck.k9.activity.setup.FolderSettings;
 import com.fsck.k9.activity.setup.Prefs;
@@ -108,7 +110,7 @@ public class FolderList extends K9ListActivity {
                     if (mUnreadMessageCount == 0) {
                         mActionBarUnread.setVisibility(View.GONE);
                     } else {
-                        mActionBarUnread.setText(Integer.toString(mUnreadMessageCount));
+                        mActionBarUnread.setText(String.format("%d", mUnreadMessageCount));
                         mActionBarUnread.setVisibility(View.VISIBLE);
                     }
 
@@ -256,7 +258,7 @@ public class FolderList extends K9ListActivity {
             return;
         }
 
-        mActionBarProgressView = getLayoutInflater().inflate(R.layout.actionbar_indeterminate_progress_actionview, null);
+        mActionBarProgressView = getActionBarProgressView();
         mActionBar = getActionBar();
         initializeActionBar();
         setContentView(R.layout.folder_list);
@@ -292,6 +294,11 @@ public class FolderList extends K9ListActivity {
         if (cl.isFirstRun()) {
             cl.getLogDialog().show();
         }
+    }
+
+    @SuppressLint("InflateParams")
+    private View getActionBarProgressView() {
+        return getLayoutInflater().inflate(R.layout.actionbar_indeterminate_progress_actionview, null);
     }
 
     private void initializeActionBar() {
@@ -387,7 +394,7 @@ public class FolderList extends K9ListActivity {
 
         onRefresh(!REFRESH_REMOTE);
 
-        MessagingController.getInstance(getApplication()).notifyAccountCancel(this, mAccount);
+        MessagingController.getInstance(getApplication()).cancelNotificationsForAccount(mAccount);
         mAdapter.mListener.onResume(this);
     }
 
@@ -511,7 +518,7 @@ public class FolderList extends K9ListActivity {
             return true;
 
         case R.id.compose:
-            MessageCompose.actionCompose(this, mAccount);
+            MessageActions.actionCompose(this, mAccount);
 
             return true;
 
@@ -739,14 +746,14 @@ public class FolderList extends K9ListActivity {
             }
 
             @Override
-            public void listFolders(Account account, List<? extends Folder> folders) {
+            public void listFolders(Account account, List<LocalFolder> folders) {
                 if (account.equals(mAccount)) {
 
                     List<FolderInfoHolder> newFolders = new LinkedList<FolderInfoHolder>();
                     List<FolderInfoHolder> topFolders = new LinkedList<FolderInfoHolder>();
 
                     Account.FolderMode aMode = account.getFolderDisplayMode();
-                    for (Folder folder : folders) {
+                    for (LocalFolder folder : folders) {
                         Folder.FolderClass fMode = folder.getDisplayClass();
 
                         if ((aMode == FolderMode.FIRST_CLASS && fMode != Folder.FolderClass.FIRST_CLASS)
@@ -810,7 +817,7 @@ public class FolderList extends K9ListActivity {
 
             private void refreshFolder(Account account, String folderName) {
                 // There has to be a cheaper way to get at the localFolder object than this
-                Folder localFolder = null;
+                LocalFolder localFolder = null;
                 try {
                     if (account != null && folderName != null) {
                         if (!account.isAvailable(FolderList.this)) {
@@ -1038,7 +1045,7 @@ public class FolderList extends K9ListActivity {
                 }
             }
             if (folder.unreadMessageCount > 0) {
-                holder.newMessageCount.setText(Integer.toString(folder.unreadMessageCount));
+                holder.newMessageCount.setText(String.format("%d", folder.unreadMessageCount));
                 holder.newMessageCountWrapper.setOnClickListener(
                         createUnreadSearch(mAccount, folder));
                 holder.newMessageCountWrapper.setVisibility(View.VISIBLE);
@@ -1060,7 +1067,7 @@ public class FolderList extends K9ListActivity {
                     }
 
             if (K9.messageListStars() && folder.flaggedMessageCount > 0) {
-                holder.flaggedMessageCount.setText(Integer.toString(folder.flaggedMessageCount));
+                holder.flaggedMessageCount.setText(String.format("%d", folder.flaggedMessageCount));
                 holder.flaggedMessageCountWrapper.setOnClickListener(
                         createFlaggedSearch(mAccount, folder));
                 holder.flaggedMessageCountWrapper.setVisibility(View.VISIBLE);

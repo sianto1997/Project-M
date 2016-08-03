@@ -8,6 +8,45 @@
      They are automatically updated with "ant bump-version".
 -->
 <changelog>
+    <release version="5.110" versioncode="23100" >
+        <change>New option: only notify for messages from contacts</change>
+        <change>Added auto-configuration support for more providers</change>
+        <change>Improved PGP/MIME experience</change>
+        <change>Lots of internal improvements</change>
+    </release>
+    <release version="5.109" versioncode="23090" >
+        <change>Added support for List-Post header</change>
+        <change>Added support for sub-folders (WebDAV)</change>
+        <change>Display notification on authentication failures</change>
+        <change>Protect against the Surreptitious Sharing vulnerability</change>
+        <change>Re-enabled search in message bodies</change>
+        <change>Fixed support for PGP/INLINE</change>
+        <change>Fixed bug where some threads had multiple entries in the message list</change>
+        <change>Fixed 'reply to all'</change>
+        <change>More bug fixes</change>
+    </release>
+    <release version="5.108" versioncode="23080" >
+        <change>Added rudimentary support for reading and composing PGP/MIME messages</change>
+        <change>Added support for stacked single message notifications on Android Wear</change>
+        <change>Added setting to disable notifications during quiet time</change>
+        <change>Added setting to show confirmation dialog when discarding message</change>
+        <change>Added option to copy sender/recipient addresses to clipboard</change>
+        <change>Show warning when user tries to send an email without a subject</change>
+        <change>New database structure; temporarily disables fulltext search</change>
+        <change>Allow importing of settings created with newer versions of K-9 Mail</change>
+        <change>Added support for Server Name Indication</change>
+        <change>Disabled support for SSLv3 protocol/ciphers and all RC4 ciphers</change>
+        <change>Fixed bug where third-party apps couldn't delete messages from certain folders</change>
+        <change>Fixed bug in settings export with certain folder names</change>
+        <change>IMAP: Fall back to LOGIN command when AUTHENTICATE PLAIN fails</change>
+        <change>Added auto-configuration support for more providers</change>
+        <change>Added translations for Persian (Farsi) and Slovenian</change>
+        <change>Updated translations</change>
+        <change>More bug fixes</change>
+    </release>
+    <release version="5.107" versioncode="23070" >
+        <change>Fixed an issue caused by the latest Android System WebView update</change>
+    </release>
     <release version="5.106" versioncode="23060">
         <change>Fixed a bug where messages where not always displayed on Android 5.x</change>
     </release>

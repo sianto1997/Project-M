@@ -434,19 +434,17 @@ public class AccountSetupCheckSettings extends K9Activity implements OnClickList
                         afe.getMessage() == null ? "" : afe.getMessage());
             } catch (CertificateValidationException cve) {
                 handleCertificateValidationException(cve);
-            } catch (Throwable t) {
-                Log.e(K9.LOG_TAG, "Error while testing settings", t);
-                showErrorDialog(
-                        R.string.account_setup_failed_dlg_server_message_fmt,
-                        (t.getMessage() == null ? "" : t.getMessage()));
+            } catch (Exception e) {
+                Log.e(K9.LOG_TAG, "Error while testing settings", e);
+                String message = e.getMessage() == null ? "" : e.getMessage();
+                showErrorDialog(R.string.account_setup_failed_dlg_server_message_fmt, message);
             }
             return null;
         }
 
         private void clearCertificateErrorNotifications(CheckDirection direction) {
             final MessagingController ctrl = MessagingController.getInstance(getApplication());
-            ctrl.clearCertificateErrorNotifications(AccountSetupCheckSettings.this,
-                    account, direction);
+            ctrl.clearCertificateErrorNotifications(account, direction);
         }
 
         private boolean cancelled() {
@@ -479,8 +477,11 @@ public class AccountSetupCheckSettings extends K9Activity implements OnClickList
             }
             Transport transport = Transport.getInstance(K9.app, account);
             transport.close();
-            transport.open();
-            transport.close();
+            try {
+                transport.open();
+            } finally {
+                transport.close();
+            }
         }
 
         private void checkIncoming() throws MessagingException {

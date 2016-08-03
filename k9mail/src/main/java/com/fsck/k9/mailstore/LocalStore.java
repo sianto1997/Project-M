@@ -1,39 +1,6 @@
 
 package com.fsck.k9.mailstore;
 
-import android.app.Application;
-import android.content.ContentResolver;
-import android.content.ContentValues;
-import android.content.Context;
-import android.content.SharedPreferences;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
-import android.net.Uri;
-import android.text.TextUtils;
-import android.util.Log;
-import com.fsck.k9.Account;
-import com.fsck.k9.K9;
-import com.fsck.k9.Preferences;
-import com.fsck.k9.helper.UrlEncodingHelper;
-import com.fsck.k9.helper.Utility;
-import com.fsck.k9.mail.Flag;
-import com.fsck.k9.mail.Folder;
-import com.fsck.k9.mail.MessageRetrievalListener;
-import com.fsck.k9.mail.MessagingException;
-import com.fsck.k9.mail.Store;
-import com.fsck.k9.mailstore.LocalFolder.DataLocation;
-import com.fsck.k9.mailstore.StorageManager.StorageProvider;
-import com.fsck.k9.mailstore.LockableDatabase.DbCallback;
-import com.fsck.k9.mailstore.LockableDatabase.WrappedException;
-import com.fsck.k9.provider.EmailProvider;
-import com.fsck.k9.provider.EmailProvider.MessageColumns;
-import com.fsck.k9.search.LocalSearch;
-import com.fsck.k9.search.SearchSpecification.Attribute;
-import com.fsck.k9.search.SearchSpecification.SearchField;
-import com.fsck.k9.search.SqlQueryBuilder;
-import org.apache.james.mime4j.codec.Base64InputStream;
-import org.apache.james.mime4j.codec.QuotedPrintableInputStream;
-import org.apache.james.mime4j.util.MimeUtil;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -52,6 +19,45 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.content.Context;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
+import android.support.annotation.Nullable;
+import android.text.TextUtils;
+import android.util.Log;
+
+import com.fsck.k9.Account;
+import com.fsck.k9.K9;
+import com.fsck.k9.Preferences;
+import com.fsck.k9.helper.UrlEncodingHelper;
+import com.fsck.k9.helper.Utility;
+import com.fsck.k9.mail.Flag;
+import com.fsck.k9.mail.Folder;
+import com.fsck.k9.mail.MessageRetrievalListener;
+import com.fsck.k9.mail.MessagingException;
+import com.fsck.k9.mail.Store;
+import com.fsck.k9.mailstore.LocalFolder.DataLocation;
+import com.fsck.k9.mailstore.LocalFolder.MoreMessages;
+import com.fsck.k9.mailstore.LockableDatabase.DbCallback;
+import com.fsck.k9.mailstore.LockableDatabase.WrappedException;
+import com.fsck.k9.mailstore.StorageManager.StorageProvider;
+import com.fsck.k9.message.extractors.AttachmentCounter;
+import com.fsck.k9.message.extractors.MessageFulltextCreator;
+import com.fsck.k9.message.extractors.MessagePreviewCreator;
+import com.fsck.k9.preferences.Storage;
+import com.fsck.k9.provider.EmailProvider;
+import com.fsck.k9.provider.EmailProvider.MessageColumns;
+import com.fsck.k9.search.LocalSearch;
+import com.fsck.k9.search.SearchSpecification.Attribute;
+import com.fsck.k9.search.SearchSpecification.SearchField;
+import com.fsck.k9.search.SqlQueryBuilder;
+import org.apache.james.mime4j.codec.Base64InputStream;
+import org.apache.james.mime4j.codec.QuotedPrintableInputStream;
+import org.apache.james.mime4j.util.MimeUtil;
+
 /**
  * <pre>
  * Implements a SQLite database backed local store for Messages.
@@ -67,14 +73,14 @@ public class LocalStore extends Store implements Serializable {
     /**
      * Lock objects indexed by account UUID.
      *
-     * @see #getInstance(Account, Application)
+     * @see #getInstance(Account, Context)
      */
-    private static ConcurrentMap<String, Object> sAccountLocks = new ConcurrentHashMap<String, Object>();
+    private static ConcurrentMap<String, Object> sAccountLocks = new ConcurrentHashMap<>();
 
     /**
      * Local stores indexed by UUID because the Uri may change due to migration to/from SD-card.
      */
-    private static ConcurrentMap<String, LocalStore> sLocalStores = new ConcurrentHashMap<String, LocalStore>();
+    private static ConcurrentMap<String, LocalStore> sLocalStores = new ConcurrentHashMap<>();
 
     /*
      * a String containing the columns getMessages expects to work with
@@ -84,11 +90,11 @@ public class LocalStore extends Store implements Serializable {
         "subject, sender_list, date, uid, flags, messages.id, to_list, cc_list, " +
         "bcc_list, reply_to_list, attachment_count, internal_date, messages.message_id, " +
         "folder_id, preview, threads.id, threads.root, deleted, read, flagged, answered, " +
-        "forwarded, message_part_id, mime_type ";
+        "forwarded, message_part_id, messages.mime_type, preview_type, header ";
 
     static final String GET_FOLDER_COLS =
         "folders.id, name, visible_limit, last_updated, status, push_state, last_pushed, " +
-        "integrate, top_group, poll_class, push_class, display_class, notify_class";
+        "integrate, top_group, poll_class, push_class, display_class, notify_class, more_messages";
 
     static final int FOLDER_ID_INDEX = 0;
     static final int FOLDER_NAME_INDEX = 1;
@@ -103,6 +109,7 @@ public class LocalStore extends Store implements Serializable {
     static final int FOLDER_PUSH_CLASS_INDEX = 10;
     static final int FOLDER_DISPLAY_CLASS_INDEX = 11;
     static final int FOLDER_NOTIFY_CLASS_INDEX = 12;
+    static final int MORE_MESSAGES_INDEX = 13;
 
     static final String[] UID_CHECK_PROJECTION = { "uid" };
 
@@ -127,7 +134,7 @@ public class LocalStore extends Store implements Serializable {
      */
     private static final int THREAD_FLAG_UPDATE_BATCH_SIZE = 500;
 
-    public static final int DB_VERSION = 51;
+    public static final int DB_VERSION = 55;
 
 
     public static String getColumnNameForFlag(Flag flag) {
@@ -159,15 +166,16 @@ public class LocalStore extends Store implements Serializable {
 
     private ContentResolver mContentResolver;
     private final Account mAccount;
+    private final MessagePreviewCreator messagePreviewCreator;
+    private final MessageFulltextCreator messageFulltextCreator;
+    private final AttachmentCounter attachmentCounter;
 
     /**
      * local://localhost/path/to/database/uuid.db
-     * This constructor is only used by {@link Store#getLocalInstance(Account, Context)}
-     * @param account
-     * @param context
+     * This constructor is only used by {@link LocalStore#getInstance(Account, Context)}
      * @throws UnavailableStorageException if not {@link StorageProvider#isReady(Context)}
      */
-    public LocalStore(final Account account, final Context context) throws MessagingException {
+    private LocalStore(final Account account, final Context context) throws MessagingException {
         mAccount = account;
         database = new LockableDatabase(context, account.getUuid(), new StoreSchemaDefinition(this));
 
@@ -175,6 +183,10 @@ public class LocalStore extends Store implements Serializable {
         mContentResolver = context.getContentResolver();
         database.setStorageProviderId(account.getLocalStorageProviderId());
         uUid = account.getUuid();
+
+        messagePreviewCreator = MessagePreviewCreator.newInstance();
+        messageFulltextCreator = MessageFulltextCreator.newInstance();
+        attachmentCounter = AttachmentCounter.newInstance();
 
         database.open();
     }
@@ -193,12 +205,9 @@ public class LocalStore extends Store implements Serializable {
         // Create new per-account lock object if necessary
         sAccountLocks.putIfAbsent(accountUuid, new Object());
 
-        // Get the account's lock object
-        Object lock = sAccountLocks.get(accountUuid);
-
         // Use per-account locks so DatabaseUpgradeService always knows which account database is
         // currently upgraded.
-        synchronized (lock) {
+        synchronized (sAccountLocks.get(accountUuid)) {
             LocalStore store = sLocalStores.get(accountUuid);
 
             if (store == null) {
@@ -234,8 +243,8 @@ public class LocalStore extends Store implements Serializable {
         return mAccount;
     }
 
-    protected SharedPreferences getPreferences() {
-        return Preferences.getPreferences(context).getPreferences();
+    protected Storage getStorage() {
+        return Preferences.getPreferences(context).getStorage();
     }
 
     public long getSize() throws MessagingException {
@@ -359,8 +368,8 @@ public class LocalStore extends Store implements Serializable {
 
     // TODO this takes about 260-300ms, seems slow.
     @Override
-    public List <? extends Folder > getPersonalNamespaces(boolean forceListAll) throws MessagingException {
-        final List<LocalFolder> folders = new LinkedList<LocalFolder>();
+    public List<LocalFolder> getPersonalNamespaces(boolean forceListAll) throws MessagingException {
+        final List<LocalFolder> folders = new LinkedList<>();
         try {
             database.execute(false, new DbCallback < List <? extends Folder >> () {
                 @Override
@@ -442,6 +451,7 @@ public class LocalStore extends Store implements Serializable {
     public void resetVisibleLimits(int visibleLimit) throws MessagingException {
         final ContentValues cv = new ContentValues();
         cv.put("visible_limit", Integer.toString(visibleLimit));
+        cv.put("more_messages", MoreMessages.UNKNOWN.getDatabaseName());
         database.execute(false, new DbCallback<Void>() {
             @Override
             public Void doDbWork(final SQLiteDatabase db) throws WrappedException {
@@ -464,7 +474,7 @@ public class LocalStore extends Store implements Serializable {
                                       null,
                                       null,
                                       "id ASC");
-                    List<PendingCommand> commands = new ArrayList<PendingCommand>();
+                    List<PendingCommand> commands = new ArrayList<>();
                     while (cursor.moveToNext()) {
                         PendingCommand command = new PendingCommand();
                         command.mId = cursor.getLong(0);
@@ -549,11 +559,11 @@ public class LocalStore extends Store implements Serializable {
         return true;
     }
 
-    public List<LocalMessage> searchForMessages(MessageRetrievalListener retrievalListener,
+    public List<LocalMessage> searchForMessages(MessageRetrievalListener<LocalMessage> retrievalListener,
                                         LocalSearch search) throws MessagingException {
 
         StringBuilder query = new StringBuilder();
-        List<String> queryArgs = new ArrayList<String>();
+        List<String> queryArgs = new ArrayList<>();
         SqlQueryBuilder.buildWhereClause(mAccount, search.getConditions(), query, queryArgs);
 
         // Avoid "ambiguous column name" error by prefixing "id" with the message table name
@@ -564,8 +574,9 @@ public class LocalStore extends Store implements Serializable {
 
         String sqlQuery = "SELECT " + GET_MESSAGES_COLS + "FROM messages " +
                 "LEFT JOIN threads ON (threads.message_id = messages.id) " +
+                "LEFT JOIN message_parts ON (message_parts.id = messages.message_part_id) " +
                 "LEFT JOIN folders ON (folders.id = messages.folder_id) WHERE " +
-                "((empty IS NULL OR empty != 1) AND deleted = 0)" +
+                "(empty = 0 AND deleted = 0)" +
                 ((!TextUtils.isEmpty(where)) ? " AND (" + where + ")" : "") +
                 " ORDER BY date DESC";
 
@@ -581,11 +592,11 @@ public class LocalStore extends Store implements Serializable {
      * call the MessageRetrievalListener for each one
      */
     List<LocalMessage> getMessages(
-        final MessageRetrievalListener listener,
+        final MessageRetrievalListener<LocalMessage> listener,
         final LocalFolder folder,
         final String queryString, final String[] placeHolders
     ) throws MessagingException {
-        final List<LocalMessage> messages = new ArrayList<LocalMessage>();
+        final List<LocalMessage> messages = new ArrayList<>();
         final int j = database.execute(false, new DbCallback<Integer>() {
             @Override
             public Integer doDbWork(final SQLiteDatabase db) throws WrappedException {
@@ -672,6 +683,7 @@ public class LocalStore extends Store implements Serializable {
         });
     }
 
+    @Nullable
     public InputStream getAttachmentInputStream(final String attachmentId) throws MessagingException {
         return database.execute(false, new DbCallback<InputStream>() {
             @Override
@@ -698,6 +710,7 @@ public class LocalStore extends Store implements Serializable {
         });
     }
 
+    @Nullable
     private InputStream getRawAttachmentInputStream(Cursor cursor, int location, String attachmentId) {
         switch (location) {
             case DataLocation.IN_DATABASE: {
@@ -709,7 +722,7 @@ public class LocalStore extends Store implements Serializable {
                 try {
                     return new FileInputStream(file);
                 } catch (FileNotFoundException e) {
-                    throw new WrappedException(e);
+                    return null;
                 }
             }
             default: {
@@ -718,7 +731,12 @@ public class LocalStore extends Store implements Serializable {
         }
     }
 
-    InputStream getDecodingInputStream(final InputStream rawInputStream, String encoding) {
+    @Nullable
+    InputStream getDecodingInputStream(@Nullable final InputStream rawInputStream, @Nullable String encoding) {
+        if (rawInputStream == null) {
+            return null;
+        }
+
         if (MimeUtil.ENC_BASE64.equals(encoding)) {
             return new Base64InputStream(rawInputStream) {
                 @Override
@@ -802,8 +820,8 @@ public class LocalStore extends Store implements Serializable {
     }
 
 
-    String serializeFlags(Iterable<Flag> flags) {
-        List<Flag> extraFlags = new ArrayList<Flag>();
+    static String serializeFlags(Iterable<Flag> flags) {
+        List<Flag> extraFlags = new ArrayList<>();
 
         for (Flag flag : flags) {
             switch (flag) {
@@ -826,6 +844,18 @@ public class LocalStore extends Store implements Serializable {
     // TODO: database should not be exposed!
     public LockableDatabase getDatabase() {
         return database;
+    }
+
+    public MessagePreviewCreator getMessagePreviewCreator() {
+        return messagePreviewCreator;
+    }
+
+    public MessageFulltextCreator getMessageFulltextCreator() {
+        return messageFulltextCreator;
+    }
+
+    public AttachmentCounter getAttachmentCounter() {
+        return attachmentCounter;
     }
 
     void notifyChange() {
@@ -852,7 +882,7 @@ public class LocalStore extends Store implements Serializable {
     public void doBatchSetSelection(final BatchSetSelection selectionCallback, final int batchSize)
             throws MessagingException {
 
-        final List<String> selectionArgs = new ArrayList<String>();
+        final List<String> selectionArgs = new ArrayList<>();
         int start = 0;
 
         while (start < selectionCallback.getListSize()) {
@@ -978,7 +1008,7 @@ public class LocalStore extends Store implements Serializable {
             public void doDbWork(SQLiteDatabase db, String selectionSet, String[] selectionArgs)
                     throws UnavailableStorageException {
 
-                db.update("messages", cv, "(empty IS NULL OR empty != 1) AND id" + selectionSet,
+                db.update("messages", cv, "empty = 0 AND id" + selectionSet,
                         selectionArgs);
             }
 
@@ -1030,7 +1060,7 @@ public class LocalStore extends Store implements Serializable {
                         " WHERE id IN (" +
                         "SELECT m.id FROM threads t " +
                         "LEFT JOIN messages m ON (t.message_id = m.id) " +
-                        "WHERE (m.empty IS NULL OR m.empty != 1) AND m.deleted = 0 " +
+                        "WHERE m.empty = 0 AND m.deleted = 0 " +
                         "AND t.root" + selectionSet + ")",
                         selectionArgs);
             }
@@ -1060,7 +1090,7 @@ public class LocalStore extends Store implements Serializable {
     public Map<String, List<String>> getFoldersAndUids(final List<Long> messageIds,
             final boolean threadedList) throws MessagingException {
 
-        final Map<String, List<String>> folderMap = new HashMap<String, List<String>>();
+        final Map<String, List<String>> folderMap = new HashMap<>();
 
         doBatchSetSelection(new BatchSetSelection() {
 
@@ -1083,7 +1113,7 @@ public class LocalStore extends Store implements Serializable {
                             "FROM threads t " +
                             "LEFT JOIN messages m ON (t.message_id = m.id) " +
                             "LEFT JOIN folders f ON (m.folder_id = f.id) " +
-                            "WHERE (m.empty IS NULL OR m.empty != 1) AND m.deleted = 0 " +
+                            "WHERE m.empty = 0 AND m.deleted = 0 " +
                             "AND t.root" + selectionSet;
 
                     getDataFromCursor(db.rawQuery(sql, selectionArgs));
@@ -1093,7 +1123,7 @@ public class LocalStore extends Store implements Serializable {
                             "SELECT m.uid, f.name " +
                             "FROM messages m " +
                             "LEFT JOIN folders f ON (m.folder_id = f.id) " +
-                            "WHERE (m.empty IS NULL OR m.empty != 1) AND m.id" + selectionSet;
+                            "WHERE m.empty = 0 AND m.id" + selectionSet;
 
                     getDataFromCursor(db.rawQuery(sql, selectionArgs));
                 }
@@ -1107,7 +1137,7 @@ public class LocalStore extends Store implements Serializable {
 
                         List<String> uidList = folderMap.get(folderName);
                         if (uidList == null) {
-                            uidList = new ArrayList<String>();
+                            uidList = new ArrayList<>();
                             folderMap.put(folderName, uidList);
                         }
 

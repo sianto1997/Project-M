@@ -1,22 +1,27 @@
 package com.fsck.k9.activity;
 
+
 import java.util.Collection;
 import java.util.List;
 
+import android.annotation.SuppressLint;
 import android.app.ActionBar;
+import android.app.FragmentManager;
+import android.app.FragmentManager.OnBackStackChangedListener;
+import android.app.FragmentTransaction;
 import android.app.SearchManager;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences.Editor;
+import android.content.IntentSender;
+import android.content.IntentSender.SendIntentException;
 import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.app.FragmentManager;
-import android.app.FragmentManager.OnBackStackChangedListener;
-import android.app.FragmentTransaction;
+import android.os.Parcelable;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
@@ -33,28 +38,28 @@ import com.fsck.k9.K9;
 import com.fsck.k9.K9.SplitViewMode;
 import com.fsck.k9.Preferences;
 import com.fsck.k9.R;
+import com.fsck.k9.activity.compose.MessageActions;
 import com.fsck.k9.activity.misc.SwipeGestureDetector.OnSwipeGestureListener;
 import com.fsck.k9.activity.setup.AccountSettings;
 import com.fsck.k9.activity.setup.FolderSettings;
 import com.fsck.k9.activity.setup.Prefs;
-import com.fsck.k9.crypto.PgpData;
 import com.fsck.k9.fragment.MessageListFragment;
 import com.fsck.k9.fragment.MessageListFragment.MessageListFragmentListener;
-import com.fsck.k9.ui.messageview.MessageViewFragment;
-import com.fsck.k9.ui.messageview.MessageViewFragment.MessageViewFragmentListener;
-import com.fsck.k9.mailstore.StorageManager;
 import com.fsck.k9.mailstore.LocalMessage;
+import com.fsck.k9.mailstore.StorageManager;
+import com.fsck.k9.preferences.StorageEditor;
 import com.fsck.k9.search.LocalSearch;
 import com.fsck.k9.search.SearchAccount;
 import com.fsck.k9.search.SearchSpecification;
 import com.fsck.k9.search.SearchSpecification.Attribute;
 import com.fsck.k9.search.SearchSpecification.SearchCondition;
 import com.fsck.k9.search.SearchSpecification.SearchField;
+import com.fsck.k9.ui.messageview.MessageViewFragment;
+import com.fsck.k9.ui.messageview.MessageViewFragment.MessageViewFragmentListener;
 import com.fsck.k9.view.MessageHeader;
 import com.fsck.k9.view.MessageTitleView;
 import com.fsck.k9.view.ViewSwitcher;
 import com.fsck.k9.view.ViewSwitcher.OnSwitchCompleteListener;
-
 import de.cketti.library.changelog.ChangeLog;
 
 
@@ -87,6 +92,7 @@ public class MessageList extends K9Activity implements MessageListFragmentListen
     private static final int PREVIOUS = 1;
     private static final int NEXT = 2;
 
+    public static final int REQUEST_MASK_PENDING_INTENT = 1 << 16;
 
     public static void actionDisplaySearch(Context context, SearchSpecification search,
             boolean noThreading, boolean newTask) {
@@ -341,7 +347,9 @@ public class MessageList extends K9Activity implements MessageListFragmentListen
 
     private void initializeLayout() {
         mMessageViewContainer = (ViewGroup) findViewById(R.id.message_view_container);
-        mMessageViewPlaceHolder = getLayoutInflater().inflate(R.layout.empty_message_view, null);
+
+        LayoutInflater layoutInflater = getLayoutInflater();
+        mMessageViewPlaceHolder = layoutInflater.inflate(R.layout.empty_message_view, mMessageViewContainer, false);
     }
 
     private void displayViews() {
@@ -530,10 +538,14 @@ public class MessageList extends K9Activity implements MessageListFragmentListen
         mActionBarSubTitle = (TextView) customView.findViewById(R.id.actionbar_title_sub);
         mActionBarUnread = (TextView) customView.findViewById(R.id.actionbar_unread_count);
         mActionBarProgress = (ProgressBar) customView.findViewById(R.id.actionbar_progress);
-        mActionButtonIndeterminateProgress =
-                getLayoutInflater().inflate(R.layout.actionbar_indeterminate_progress_actionview, null);
+        mActionButtonIndeterminateProgress = getActionButtonIndeterminateProgress();
 
         mActionBar.setDisplayHomeAsUpEnabled(true);
+    }
+
+    @SuppressLint("InflateParams")
+    private View getActionButtonIndeterminateProgress() {
+        return getLayoutInflater().inflate(R.layout.actionbar_indeterminate_progress_actionview, null);
     }
 
     @Override
@@ -825,7 +837,7 @@ public class MessageList extends K9Activity implements MessageListFragmentListen
                 return true;
             }
             case R.id.mark_all_as_read: {
-                mMessageListFragment.markAllAsRead();
+                mMessageListFragment.confirmMarkAllAsRead();
                 return true;
             }
             case R.id.show_folder_list: {
@@ -1140,7 +1152,7 @@ public class MessageList extends K9Activity implements MessageListFragmentListen
             mActionBarUnread.setVisibility(View.GONE);
         } else {
             mActionBarUnread.setVisibility(View.VISIBLE);
-            mActionBarUnread.setText(Integer.toString(unread));
+            mActionBarUnread.setText(String.format("%d", unread));
         }
     }
 
@@ -1171,7 +1183,7 @@ public class MessageList extends K9Activity implements MessageListFragmentListen
         String folderName = messageReference.getFolderName();
 
         if (folderName.equals(account.getDraftsFolderName())) {
-            MessageCompose.actionEditDraft(this, messageReference);
+            MessageActions.actionEditDraft(this, messageReference);
         } else {
             mMessageViewContainer.removeView(mMessageViewPlaceHolder);
 
@@ -1193,27 +1205,42 @@ public class MessageList extends K9Activity implements MessageListFragmentListen
 
     @Override
     public void onResendMessage(LocalMessage message) {
-        MessageCompose.actionEditDraft(this, message.makeMessageReference());
+        MessageActions.actionEditDraft(this, message.makeMessageReference());
     }
 
     @Override
     public void onForward(LocalMessage message) {
-        MessageCompose.actionForward(this, message, null);
+        onForward(message, null);
+    }
+
+    @Override
+    public void onForward(LocalMessage message, Parcelable decryptionResultForReply) {
+        MessageActions.actionForward(this, message, decryptionResultForReply);
     }
 
     @Override
     public void onReply(LocalMessage message) {
-        MessageCompose.actionReply(this, message, false, null);
+        onReply(message, null);
+    }
+
+    @Override
+    public void onReply(LocalMessage message, Parcelable decryptionResultForReply) {
+        MessageActions.actionReply(this, message, false, decryptionResultForReply);
     }
 
     @Override
     public void onReplyAll(LocalMessage message) {
-        MessageCompose.actionReply(this, message, true, null);
+        onReplyAll(message, null);
+    }
+
+    @Override
+    public void onReplyAll(LocalMessage message, Parcelable decryptionResultForReply) {
+        MessageActions.actionReply(this, message, true, decryptionResultForReply);
     }
 
     @Override
     public void onCompose(Account account) {
-        MessageCompose.actionCompose(this, account);
+        MessageActions.actionCompose(this, account);
     }
 
     @Override
@@ -1398,21 +1425,6 @@ public class MessageList extends K9Activity implements MessageListFragmentListen
     }
 
     @Override
-    public void onReply(LocalMessage message, PgpData pgpData) {
-        MessageCompose.actionReply(this, message, false, pgpData.getDecryptedData());
-    }
-
-    @Override
-    public void onReplyAll(LocalMessage message, PgpData pgpData) {
-        MessageCompose.actionReply(this, message, true, pgpData.getDecryptedData());
-    }
-
-    @Override
-    public void onForward(LocalMessage mMessage, PgpData mPgpData) {
-        MessageCompose.actionForward(this, mMessage, mPgpData.getDecryptedData());
-    }
-
-    @Override
     public void showNextMessageOrReturn() {
         if (K9.messageViewReturnToList() || !showLogicalNextMessage()) {
             if (mDisplayMode == DisplayMode.SPLIT_VIEW) {
@@ -1520,7 +1532,7 @@ public class MessageList extends K9Activity implements MessageListFragmentListen
             public void run() {
                 Context appContext = getApplicationContext();
                 Preferences prefs = Preferences.getPreferences(appContext);
-                Editor editor = prefs.getPreferences().edit();
+                StorageEditor editor = prefs.getStorage().edit();
                 K9.save(editor);
                 editor.commit();
             }
@@ -1558,11 +1570,21 @@ public class MessageList extends K9Activity implements MessageListFragmentListen
     }
 
     @Override
+    public void startIntentSenderForResult(IntentSender intent, int requestCode, Intent fillInIntent,
+            int flagsMask, int flagsValues, int extraFlags) throws SendIntentException {
+        requestCode |= REQUEST_MASK_PENDING_INTENT;
+        super.startIntentSenderForResult(intent, requestCode, fillInIntent, flagsMask, flagsValues, extraFlags);
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (mMessageViewFragment != null) {
-            mMessageViewFragment.handleCryptoResult(requestCode, resultCode, data);
+        if ((requestCode & REQUEST_MASK_PENDING_INTENT) == REQUEST_MASK_PENDING_INTENT) {
+            requestCode ^= REQUEST_MASK_PENDING_INTENT;
+            if (mMessageViewFragment != null) {
+                mMessageViewFragment.onPendingIntentResult(requestCode, resultCode, data);
+            }
         }
     }
 }

@@ -9,8 +9,6 @@ import java.util.Set;
 
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
-import android.content.SharedPreferences.Editor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.preference.CheckBoxPreference;
@@ -29,10 +27,12 @@ import com.fsck.k9.Preferences;
 import com.fsck.k9.R;
 import com.fsck.k9.activity.ColorPickerDialog;
 import com.fsck.k9.activity.K9PreferenceActivity;
-import com.fsck.k9.controller.MessagingController;
 import com.fsck.k9.helper.FileBrowserHelper;
 import com.fsck.k9.helper.FileBrowserHelper.FileBrowserFailOverCallback;
+import com.fsck.k9.notification.NotificationController;
 import com.fsck.k9.preferences.CheckBoxListPreference;
+import com.fsck.k9.preferences.Storage;
+import com.fsck.k9.preferences.StorageEditor;
 import com.fsck.k9.preferences.TimePickerPreference;
 
 import com.fsck.k9.service.MailService;
@@ -213,9 +213,9 @@ public class Prefs extends K9PreferenceActivity {
 
         mConfirmActions = (CheckBoxListPreference) findPreference(PREFERENCE_CONFIRM_ACTIONS);
 
-        boolean canDeleteFromNotification = MessagingController.platformSupportsExtendedNotifications();
-        CharSequence[] confirmActionEntries = new CharSequence[canDeleteFromNotification ? 4 : 3];
-        boolean[] confirmActionValues = new boolean[canDeleteFromNotification ? 4 : 3];
+        boolean canDeleteFromNotification = NotificationController.platformSupportsExtendedNotifications();
+        CharSequence[] confirmActionEntries = new CharSequence[canDeleteFromNotification ? 5 : 4];
+        boolean[] confirmActionValues = new boolean[canDeleteFromNotification ? 5 : 4];
         int index = 0;
 
         confirmActionEntries[index] = getString(R.string.global_settings_confirm_action_delete);
@@ -228,6 +228,8 @@ public class Prefs extends K9PreferenceActivity {
         }
         confirmActionEntries[index] = getString(R.string.global_settings_confirm_action_spam);
         confirmActionValues[index++] = K9.confirmSpam();
+        confirmActionEntries[index] = getString(R.string.global_settings_confirm_menu_discard);
+        confirmActionValues[index++] = K9.confirmDiscardMessage();
 
         mConfirmActions.setItems(confirmActionEntries);
         mConfirmActions.setCheckedItems(confirmActionValues);
@@ -339,7 +341,7 @@ public class Prefs extends K9PreferenceActivity {
 
         mNotificationQuickDelete = setupListPreference(PREFERENCE_NOTIF_QUICK_DELETE,
                 K9.getNotificationQuickDeleteBehaviour().toString());
-        if (!MessagingController.platformSupportsExtendedNotifications()) {
+        if (!NotificationController.platformSupportsExtendedNotifications()) {
             PreferenceScreen prefs = (PreferenceScreen) findPreference("notification_preferences");
             prefs.removePreference(mNotificationQuickDelete);
             mNotificationQuickDelete = null;
@@ -347,7 +349,7 @@ public class Prefs extends K9PreferenceActivity {
 
         mLockScreenNotificationVisibility = setupListPreference(PREFERENCE_LOCK_SCREEN_NOTIFICATION_VISIBILITY,
             K9.getLockScreenNotificationVisibility().toString());
-        if (!MessagingController.platformSupportsLockScreenNotifications()) {
+        if (!NotificationController.platformSupportsLockScreenNotifications()) {
             ((PreferenceScreen) findPreference("notification_preferences"))
                 .removePreference(mLockScreenNotificationVisibility);
             mLockScreenNotificationVisibility = null;
@@ -440,7 +442,7 @@ public class Prefs extends K9PreferenceActivity {
     }
 
     private void saveSettings() {
-        SharedPreferences preferences = Preferences.getPreferences(this).getPreferences();
+        Storage storage = Preferences.getPreferences(this).getStorage();
 
         K9.setK9Language(mLanguage.getValue());
 
@@ -459,10 +461,11 @@ public class Prefs extends K9PreferenceActivity {
         int index = 0;
         K9.setConfirmDelete(mConfirmActions.getCheckedItems()[index++]);
         K9.setConfirmDeleteStarred(mConfirmActions.getCheckedItems()[index++]);
-        if (MessagingController.platformSupportsExtendedNotifications()) {
+        if (NotificationController.platformSupportsExtendedNotifications()) {
             K9.setConfirmDeleteFromNotification(mConfirmActions.getCheckedItems()[index++]);
         }
         K9.setConfirmSpam(mConfirmActions.getCheckedItems()[index++]);
+        K9.setConfirmDiscardMessage(mConfirmActions.getCheckedItems()[index++]);
 
         K9.setMeasureAccounts(mMeasureAccounts.isChecked());
         K9.setCountSearchMessages(mCountSearch.isChecked());
@@ -518,7 +521,7 @@ public class Prefs extends K9PreferenceActivity {
         K9.setHideUserAgent(mHideUserAgent.isChecked());
         K9.setHideTimeZone(mHideTimeZone.isChecked());
 
-        Editor editor = preferences.edit();
+        StorageEditor editor = storage.edit();
         K9.save(editor);
         editor.commit();
 

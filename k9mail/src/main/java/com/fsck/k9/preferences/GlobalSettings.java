@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-import android.content.SharedPreferences;
 import android.os.Environment;
 
 import com.fsck.k9.Account;
@@ -43,7 +42,9 @@ public class GlobalSettings {
                 new V(1, new BooleanSetting(false))
             ));
         s.put("attachmentdefaultpath", Settings.versions(
-                new V(1, new DirectorySetting(Environment.getExternalStorageDirectory().toString()))
+                new V(1, new DirectorySetting(Environment.getExternalStorageDirectory())),
+                new V(41, new DirectorySetting(Environment.getExternalStoragePublicDirectory(
+                        Environment.DIRECTORY_DOWNLOADS)))
             ));
         s.put("backgroundOperations", Settings.versions(
                 new V(1, new EnumSetting<K9.BACKGROUND_OPS>(
@@ -268,7 +269,10 @@ public class GlobalSettings {
             ));
         s.put("notificationDuringQuietTimeEnabled", Settings.versions(
                 new V(39, new BooleanSetting(true))
-        ));
+            ));
+        s.put("confirmDiscardMessage", Settings.versions(
+                new V(40, new BooleanSetting(true))
+            ));
 
         SETTINGS = Collections.unmodifiableMap(s);
 
@@ -292,7 +296,7 @@ public class GlobalSettings {
         return Settings.convert(settings, SETTINGS);
     }
 
-    public static Map<String, String> getGlobalSettings(SharedPreferences storage) {
+    public static Map<String, String> getGlobalSettings(Storage storage) {
         Map<String, String> result = new HashMap<String, String>();
         for (String key : SETTINGS.keySet()) {
             String value = storage.getString(key, null);
@@ -552,8 +556,8 @@ public class GlobalSettings {
      * A directory on the file system.
      */
     public static class DirectorySetting extends SettingsDescription {
-        public DirectorySetting(String defaultValue) {
-            super(defaultValue);
+        public DirectorySetting(File defaultPath) {
+            super(defaultPath.toString());
         }
 
         @Override
