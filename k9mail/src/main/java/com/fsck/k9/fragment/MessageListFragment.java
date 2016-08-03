@@ -1838,7 +1838,7 @@ public class MessageListFragment extends Fragment implements OnItemClickListener
 
             MessageViewHolder holder = new MessageViewHolder();
             holder.date = (TextView) view.findViewById(R.id.date);
-            holder.chip = view.findViewById(R.id.chip);
+            //holder.chip = view.findViewById(R.id.chip);
 
 
             if (mPreviewLines == 0 && mContactsPictureLoader == null) {
@@ -1952,7 +1952,7 @@ public class MessageListFragment extends Fragment implements OnItemClickListener
             boolean selected = mSelected.contains(uniqueId);
 
 
-            holder.chip.setBackgroundColor(account.getChipColor());
+            //holder.chip.setBackgroundColor(account.getChipColor());
 
             if (mCheckboxes) {
                 holder.selected.setChecked(selected);
