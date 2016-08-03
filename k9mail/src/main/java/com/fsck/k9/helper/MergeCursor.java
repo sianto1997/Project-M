@@ -17,8 +17,6 @@
 
 package com.fsck.k9.helper;
 
-import java.util.Comparator;
-
 import android.content.ContentResolver;
 import android.database.CharArrayBuffer;
 import android.database.ContentObserver;
@@ -26,6 +24,8 @@ import android.database.Cursor;
 import android.database.DataSetObserver;
 import android.net.Uri;
 import android.os.Bundle;
+
+import java.util.Comparator;
 
 
 /**
@@ -211,6 +211,11 @@ public class MergeCursor implements Cursor {
     @Override
     public boolean getWantsAllOnMoveCalls() {
         return mActiveCursor.getWantsAllOnMoveCalls();
+    }
+
+    @Override
+    public void setExtras(Bundle extras) {
+
     }
 
     @Override
