@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import android.content.SharedPreferences;
 import com.fsck.k9.Account;
 import com.fsck.k9.Account.DeletePolicy;
 import com.fsck.k9.Account.Expunge;
@@ -224,9 +225,6 @@ public class AccountSettings {
         s.put("remoteSearchFullText", Settings.versions(
                 new V(18, new BooleanSetting(false))
             ));
-        s.put("notifyContactsMailOnly", Settings.versions(
-                new V(42, new BooleanSetting(false))
-            ));
 
         SETTINGS = Collections.unmodifiableMap(s);
 
@@ -247,7 +245,7 @@ public class AccountSettings {
         return Settings.convert(settings, SETTINGS);
     }
 
-    public static Map<String, String> getAccountSettings(Storage storage, String uuid) {
+    public static Map<String, String> getAccountSettings(SharedPreferences storage, String uuid) {
         Map<String, String> result = new HashMap<String, String>();
         String prefix = uuid + ".";
         for (String key : SETTINGS.keySet()) {

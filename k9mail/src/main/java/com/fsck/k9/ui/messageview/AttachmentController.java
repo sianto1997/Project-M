@@ -8,7 +8,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
 
-import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -28,6 +27,7 @@ import com.fsck.k9.cache.TemporaryAttachmentStore;
 import com.fsck.k9.controller.MessagingController;
 import com.fsck.k9.controller.MessagingListener;
 import com.fsck.k9.helper.FileHelper;
+import com.fsck.k9.helper.MediaScannerNotifier;
 import com.fsck.k9.mail.Message;
 import com.fsck.k9.mail.Part;
 import com.fsck.k9.mail.internet.MimeUtility;
@@ -42,14 +42,11 @@ public class AttachmentController {
     private final MessagingController controller;
     private final MessageViewFragment messageViewFragment;
     private final AttachmentViewInfo attachment;
-    private final DownloadManager downloadManager;
 
-
-    AttachmentController(MessagingController controller, DownloadManager downloadManager,
-            MessageViewFragment messageViewFragment, AttachmentViewInfo attachment) {
-        this.context = messageViewFragment.getApplicationContext();
+    AttachmentController(MessagingController controller, MessageViewFragment messageViewFragment,
+            AttachmentViewInfo attachment) {
+        this.context = messageViewFragment.getContext();
         this.controller = controller;
-        this.downloadManager = downloadManager;
         this.messageViewFragment = messageViewFragment;
         this.attachment = attachment;
     }
@@ -150,8 +147,6 @@ public class AttachmentController {
 
         writeAttachmentToStorage(file);
 
-        addSavedAttachmentToDownloadsDatabase(file);
-
         return file;
     }
 
@@ -168,15 +163,6 @@ public class AttachmentController {
         } finally {
             in.close();
         }
-    }
-
-    private void addSavedAttachmentToDownloadsDatabase(File file) {
-        String fileName = file.getName();
-        String path = file.getAbsolutePath();
-        long fileLength = file.length();
-        String mimeType = attachment.mimeType;
-
-        downloadManager.addCompletedDownload(fileName, fileName, true, mimeType, path, fileLength, true);
     }
 
     private Intent getBestViewIntentAndSaveFileIfNecessary() {
@@ -279,6 +265,11 @@ public class AttachmentController {
         return resolveInfos.size();
     }
 
+    private void displayAttachmentSavedMessage(final String filename) {
+        String message = context.getString(R.string.message_view_status_attachment_saved, filename);
+        displayMessageToUser(message);
+    }
+
     private void displayAttachmentNotSavedMessage() {
         String message = context.getString(R.string.message_view_status_attachment_not_saved);
         displayMessageToUser(message);
@@ -367,7 +358,10 @@ public class AttachmentController {
         @Override
         protected void onPostExecute(File file) {
             messageViewFragment.enableAttachmentButtons(attachment);
-            if (file == null) {
+            if (file != null) {
+                displayAttachmentSavedMessage(file.toString());
+                MediaScannerNotifier.notify(context, file);
+            } else {
                 displayAttachmentNotSavedMessage();
             }
         }

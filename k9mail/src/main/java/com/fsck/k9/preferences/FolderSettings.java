@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import android.content.SharedPreferences;
+
 import com.fsck.k9.mail.Folder.FolderClass;
 import com.fsck.k9.preferences.Settings.*;
 
@@ -61,7 +63,7 @@ public class FolderSettings {
         return Settings.convert(settings, SETTINGS);
     }
 
-    public static Map<String, String> getFolderSettings(Storage storage, String uuid,
+    public static Map<String, String> getFolderSettings(SharedPreferences storage, String uuid,
             String folderName) {
         Map<String, String> result = new HashMap<String, String>();
         String prefix = uuid + "." + folderName + ".";

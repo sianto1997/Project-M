@@ -12,41 +12,34 @@ import android.util.Log;
 
 import com.fsck.k9.K9;
 import com.fsck.k9.activity.misc.Attachment;
-import com.fsck.k9.activity.misc.Attachment.LoadingState;
 import com.fsck.k9.mail.internet.MimeUtility;
 
 /**
  * Loader to fetch metadata of an attachment.
  */
 public class AttachmentInfoLoader  extends AsyncTaskLoader<Attachment> {
-    private final Attachment sourceAttachment;
-    private Attachment cachedResultAttachment;
-
+    private final Attachment mAttachment;
 
     public AttachmentInfoLoader(Context context, Attachment attachment) {
         super(context);
-        if (attachment.state != LoadingState.URI_ONLY) {
-            throw new IllegalArgumentException("Attachment provided to metadata loader must be in URI_ONLY state");
-        }
-
-        sourceAttachment = attachment;
+        mAttachment = attachment;
     }
 
     @Override
     protected void onStartLoading() {
-        if (cachedResultAttachment != null) {
-            deliverResult(cachedResultAttachment);
+        if (mAttachment.state == Attachment.LoadingState.METADATA) {
+            deliverResult(mAttachment);
         }
 
-        if (takeContentChanged() || cachedResultAttachment == null) {
+        if (takeContentChanged() || mAttachment.state == Attachment.LoadingState.URI_ONLY) {
             forceLoad();
         }
     }
 
     @Override
     public Attachment loadInBackground() {
-        Uri uri = sourceAttachment.uri;
-        String contentType = sourceAttachment.contentType;
+        Uri uri = mAttachment.uri;
+        String contentType = mAttachment.contentType;
 
         long size = -1;
         String name = null;
@@ -75,11 +68,10 @@ public class AttachmentInfoLoader  extends AsyncTaskLoader<Attachment> {
             name = uri.getLastPathSegment();
         }
 
-        String usableContentType = contentResolver.getType(uri);
-        if (usableContentType == null && contentType != null && contentType.indexOf('*') != -1) {
-            usableContentType = contentType;
+        String usableContentType = contentType;
+        if ((usableContentType == null) || (usableContentType.indexOf('*') != -1)) {
+            usableContentType = contentResolver.getType(uri);
         }
-
         if (usableContentType == null) {
             usableContentType = MimeUtility.getMimeTypeByExtension(name);
         }
@@ -98,7 +90,11 @@ public class AttachmentInfoLoader  extends AsyncTaskLoader<Attachment> {
         }
         Log.v(K9.LOG_TAG, "new attachment.size: " + size);
 
-        cachedResultAttachment = sourceAttachment.deriveWithMetadataLoaded(usableContentType, name, size);
-        return cachedResultAttachment;
+        mAttachment.contentType = usableContentType;
+        mAttachment.name = name;
+        mAttachment.size = size;
+        mAttachment.state = Attachment.LoadingState.METADATA;
+
+        return mAttachment;
     }
 }

@@ -184,7 +184,7 @@ public class AccountSetupOutgoing extends K9Activity implements OnClickListener,
             }
 
             if (settings.port != -1) {
-                mPortView.setText(String.format("%d", settings.port));
+                mPortView.setText(Integer.toString(settings.port));
             } else {
                 updatePortFromSecurityType();
             }

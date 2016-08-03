@@ -12,8 +12,6 @@ import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.util.Log;
 
 import com.fsck.k9.Account;
@@ -60,7 +58,7 @@ public class AttachmentProvider extends ContentProvider {
     }
 
     @Override
-    public String getType(@NonNull Uri uri) {
+    public String getType(Uri uri) {
         List<String> segments = uri.getPathSegments();
         String accountUuid = segments.get(0);
         String id = segments.get(1);
@@ -70,20 +68,16 @@ public class AttachmentProvider extends ContentProvider {
     }
 
     @Override
-    public ParcelFileDescriptor openFile(@NonNull Uri uri, @NonNull String mode) throws FileNotFoundException {
+    public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
         List<String> segments = uri.getPathSegments();
         String accountUuid = segments.get(0);
         String attachmentId = segments.get(1);
 
-        ParcelFileDescriptor parcelFileDescriptor = openAttachment(accountUuid, attachmentId);
-        if (parcelFileDescriptor == null) {
-            throw new FileNotFoundException("Attachment missing or cannot be opened!");
-        }
-        return parcelFileDescriptor;
+        return openAttachment(accountUuid, attachmentId);
     }
 
     @Override
-    public Cursor query(@NonNull Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+    public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
 
         String[] columnNames = (projection == null) ? DEFAULT_PROJECTION : projection;
 
@@ -126,18 +120,18 @@ public class AttachmentProvider extends ContentProvider {
     }
 
     @Override
-    public int update(@NonNull Uri uri, ContentValues values, String selection, String[] selectionArgs) {
-        throw new UnsupportedOperationException();
+    public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
+        return 0;
     }
 
     @Override
-    public int delete(@NonNull Uri uri, String arg1, String[] arg2) {
-        throw new UnsupportedOperationException();
+    public int delete(Uri uri, String arg1, String[] arg2) {
+        return 0;
     }
 
     @Override
-    public Uri insert(@NonNull Uri uri, ContentValues values) {
-        throw new UnsupportedOperationException();
+    public Uri insert(Uri uri, ContentValues values) {
+        return null;
     }
 
     private String getType(String accountUuid, String id, String mimeType) {
@@ -161,15 +155,10 @@ public class AttachmentProvider extends ContentProvider {
         return type;
     }
 
-    @Nullable
     private ParcelFileDescriptor openAttachment(String accountUuid, String attachmentId) {
         try {
             InputStream inputStream = getAttachmentInputStream(accountUuid, attachmentId);
-            if (inputStream == null) {
-                Log.e(K9.LOG_TAG, "Error getting InputStream for attachment (part doesn't exist?)");
-                return null;
-            }
-            return ParcelFileDescriptorUtil.pipeFrom(inputStream);
+            return ParcelFileDescriptorUtil.pipeFrom(inputStream, null);
         } catch (MessagingException e) {
             Log.e(K9.LOG_TAG, "Error getting InputStream for attachment", e);
             return null;
@@ -179,7 +168,6 @@ public class AttachmentProvider extends ContentProvider {
         }
     }
 
-    @Nullable
     private InputStream getAttachmentInputStream(String accountUuid, String attachmentId) throws MessagingException {
         final Account account = Preferences.getPreferences(getContext()).getAccount(accountUuid);
         LocalStore localStore = LocalStore.getInstance(account, getContext());

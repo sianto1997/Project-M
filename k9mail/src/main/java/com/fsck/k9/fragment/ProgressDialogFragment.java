@@ -43,13 +43,14 @@ public class ProgressDialogFragment extends DialogFragment {
         Activity activity = getActivity();
         if (activity != null && activity instanceof CancelListener) {
             CancelListener listener = (CancelListener) activity;
-            listener.onProgressCancel(this);
+            listener.onCancel(this);
         }
 
         super.onCancel(dialog);
     }
 
+
     public interface CancelListener {
-        void onProgressCancel(ProgressDialogFragment fragment);
+        void onCancel(ProgressDialogFragment fragment);
     }
 }

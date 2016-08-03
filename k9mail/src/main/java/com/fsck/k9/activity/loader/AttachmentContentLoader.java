@@ -12,9 +12,6 @@ import android.util.Log;
 import com.fsck.k9.K9;
 import com.fsck.k9.activity.misc.Attachment;
 
-import com.fsck.k9.activity.misc.Attachment.LoadingState;
-import de.cketti.safecontentresolver.SafeContentResolver;
-import de.cketti.safecontentresolver.SafeContentResolverCompat;
 import org.apache.commons.io.IOUtils;
 
 /**
@@ -25,27 +22,20 @@ import org.apache.commons.io.IOUtils;
 public class AttachmentContentLoader extends AsyncTaskLoader<Attachment> {
     private static final String FILENAME_PREFIX = "attachment";
 
-
-    private final Attachment sourceAttachment;
-    private Attachment cachedResultAttachment;
-
+    private final Attachment mAttachment;
 
     public AttachmentContentLoader(Context context, Attachment attachment) {
         super(context);
-        if (attachment.state != LoadingState.METADATA) {
-            throw new IllegalArgumentException("Attachment provided to content loader must be in METADATA state");
-        }
-
-        sourceAttachment = attachment;
+        mAttachment = attachment;
     }
 
     @Override
     protected void onStartLoading() {
-        if (cachedResultAttachment != null) {
-            deliverResult(sourceAttachment);
+        if (mAttachment.state == Attachment.LoadingState.COMPLETE) {
+            deliverResult(mAttachment);
         }
 
-        if (takeContentChanged() || cachedResultAttachment == null) {
+        if (takeContentChanged() || mAttachment.state == Attachment.LoadingState.METADATA) {
             forceLoad();
         }
     }
@@ -62,8 +52,7 @@ public class AttachmentContentLoader extends AsyncTaskLoader<Attachment> {
                 Log.v(K9.LOG_TAG, "Saving attachment to " + file.getAbsolutePath());
             }
 
-            SafeContentResolver safeContentResolver = SafeContentResolverCompat.newInstance(context);
-            InputStream in = safeContentResolver.openInputStream(sourceAttachment.uri);
+            InputStream in = context.getContentResolver().openInputStream(mAttachment.uri);
             try {
                 FileOutputStream out = new FileOutputStream(file);
                 try {
@@ -75,13 +64,17 @@ public class AttachmentContentLoader extends AsyncTaskLoader<Attachment> {
                 in.close();
             }
 
-            cachedResultAttachment = sourceAttachment.deriveWithLoadComplete(file.getAbsolutePath());
-            return cachedResultAttachment;
+            mAttachment.filename = file.getAbsolutePath();
+            mAttachment.state = Attachment.LoadingState.COMPLETE;
+
+            return mAttachment;
         } catch (IOException e) {
-            Log.e(K9.LOG_TAG, "Error saving attachment!", e);
+            e.printStackTrace();
         }
 
-        cachedResultAttachment = sourceAttachment.deriveWithLoadCancelled();
-        return cachedResultAttachment;
+        mAttachment.filename = null;
+        mAttachment.state = Attachment.LoadingState.CANCELLED;
+
+        return mAttachment;
     }
 }

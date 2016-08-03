@@ -217,9 +217,7 @@ public class TrustManagerFactoryTest {
 
     @After
     public void tearDown() {
-        if (mKeyStoreFile.exists() && !mKeyStoreFile.delete()) {
-            throw new RuntimeException("Unable to delete key store file: " + mKeyStoreFile.getAbsolutePath());
-        }
+        mKeyStoreFile.delete();
     }
 
     /**
@@ -344,9 +342,7 @@ public class TrustManagerFactoryTest {
         assertTrue(mKeyStore.isValidCertificate(mCert2, NOT_MATCHING_HOST, PORT2));
 
         // reload store from empty file
-        if (mKeyStoreFile.exists() && !mKeyStoreFile.delete()) {
-            throw new RuntimeException("Unable to delete key store file: " + mKeyStoreFile.getAbsolutePath());
-        }
+        mKeyStoreFile.delete();
         mKeyStore.setKeyStoreFile(mKeyStoreFile);
         assertFalse(mKeyStore.isValidCertificate(mCert1, MATCHING_HOST, PORT1));
         assertFalse(mKeyStore.isValidCertificate(mCert2, NOT_MATCHING_HOST, PORT2));

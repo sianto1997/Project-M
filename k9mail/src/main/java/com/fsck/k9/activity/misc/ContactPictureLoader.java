@@ -24,7 +24,7 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.support.v4.util.LruCache;
 import android.text.TextUtils;
-import android.widget.ImageView;
+import android.widget.QuickContactBadge;
 
 import com.fsck.k9.helper.Contacts;
 import com.fsck.k9.mail.Address;
@@ -111,7 +111,7 @@ public class ContactPictureLoader {
     }
 
     /**
-     * Load a contact picture and display it using the supplied {@link ImageView} instance.
+     * Load a contact picture and display it using the supplied {@link QuickContactBadge} instance.
      *
      * <p>
      * If a picture is found in the cache, it is displayed in the {@code QuickContactBadge}
@@ -123,29 +123,29 @@ public class ContactPictureLoader {
      * @param address
      *         The {@link Address} instance holding the email address that is used to search the
      *         contacts database.
-     * @param imageView
+     * @param badge
      *         The {@code QuickContactBadge} instance to receive the picture.
      *
      * @see #mBitmapCache
      * @see #calculateFallbackBitmap(Address)
      */
-    public void loadContactPicture(Address address, ImageView imageView) {
+    public void loadContactPicture(Address address, QuickContactBadge badge) {
         Bitmap bitmap = getBitmapFromCache(address);
         if (bitmap != null) {
             // The picture was found in the bitmap cache
-            imageView.setImageBitmap(bitmap);
-        } else if (cancelPotentialWork(address, imageView)) {
+            badge.setImageBitmap(bitmap);
+        } else if (cancelPotentialWork(address, badge)) {
             // Query the contacts database in a background thread and try to load the contact
             // picture, if there is one.
-            ContactPictureRetrievalTask task = new ContactPictureRetrievalTask(imageView, address);
+            ContactPictureRetrievalTask task = new ContactPictureRetrievalTask(badge, address);
             AsyncDrawable asyncDrawable = new AsyncDrawable(mResources,
                     calculateFallbackBitmap(address), task);
-            imageView.setImageDrawable(asyncDrawable);
+            badge.setImageDrawable(asyncDrawable);
             try {
                 task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
             } catch (RejectedExecutionException e) {
                 // We flooded the thread pool queue... use a fallback picture
-                imageView.setImageBitmap(calculateFallbackBitmap(address));
+                badge.setImageBitmap(calculateFallbackBitmap(address));
             }
         }
     }
@@ -220,15 +220,15 @@ public class ContactPictureLoader {
      * @param address
      *         The {@link Address} instance holding the email address that is used to search the
      *         contacts database.
-     * @param imageView
-     *         The {@link ImageView} instance that will receive the picture.
+     * @param badge
+     *         The {@code QuickContactBadge} instance that will receive the picture.
      *
      * @return {@code true}, if the contact picture should be loaded in a background thread.
      *         {@code false}, if another {@link ContactPictureRetrievalTask} was already scheduled
      *         to load that contact picture.
      */
-    private boolean cancelPotentialWork(Address address, ImageView imageView) {
-        final ContactPictureRetrievalTask task = getContactPictureRetrievalTask(imageView);
+    private boolean cancelPotentialWork(Address address, QuickContactBadge badge) {
+        final ContactPictureRetrievalTask task = getContactPictureRetrievalTask(badge);
 
         if (task != null && address != null) {
             if (!address.equals(task.getAddress())) {
@@ -244,9 +244,9 @@ public class ContactPictureLoader {
         return true;
     }
 
-    private ContactPictureRetrievalTask getContactPictureRetrievalTask(ImageView imageView) {
-        if (imageView != null) {
-           Drawable drawable = imageView.getDrawable();
+    private ContactPictureRetrievalTask getContactPictureRetrievalTask(QuickContactBadge badge) {
+        if (badge != null) {
+           Drawable drawable = badge.getDrawable();
            if (drawable instanceof AsyncDrawable) {
                AsyncDrawable asyncDrawable = (AsyncDrawable) drawable;
                return asyncDrawable.getContactPictureRetrievalTask();
@@ -261,11 +261,11 @@ public class ContactPictureLoader {
      * Load a contact picture in a background thread.
      */
     class ContactPictureRetrievalTask extends AsyncTask<Void, Void, Bitmap> {
-        private final WeakReference<ImageView> mImageViewReference;
+        private final WeakReference<QuickContactBadge> mQuickContactBadgeReference;
         private final Address mAddress;
 
-        ContactPictureRetrievalTask(ImageView imageView, Address address) {
-            mImageViewReference = new WeakReference<ImageView>(imageView);
+        ContactPictureRetrievalTask(QuickContactBadge badge, Address address) {
+            mQuickContactBadgeReference = new WeakReference<QuickContactBadge>(badge);
             mAddress = new Address(address);
         }
 
@@ -313,9 +313,11 @@ public class ContactPictureLoader {
 
         @Override
         protected void onPostExecute(Bitmap bitmap) {
-            ImageView imageView = mImageViewReference.get();
-            if (imageView != null && getContactPictureRetrievalTask(imageView) == this) {
-                imageView.setImageBitmap(bitmap);
+            if (mQuickContactBadgeReference != null) {
+                QuickContactBadge badge = mQuickContactBadgeReference.get();
+                if (badge != null && getContactPictureRetrievalTask(badge) == this) {
+                    badge.setImageBitmap(bitmap);
+                }
             }
         }
     }
@@ -326,7 +328,7 @@ public class ContactPictureLoader {
      *
      * <p>
      * The reference is used by {@link ContactPictureLoader#cancelPotentialWork(Address,
-     * ImageView)} to find out if the contact picture is already being loaded by a
+     * QuickContactBadge)} to find out if the contact picture is already being loaded by a
      * {@code ContactPictureRetrievalTask}.
      * </p>
      */

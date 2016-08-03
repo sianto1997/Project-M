@@ -1,8 +1,6 @@
 
 package com.fsck.k9.mail;
 
-import android.support.annotation.VisibleForTesting;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -20,7 +18,7 @@ import android.util.Log;
 
 import static com.fsck.k9.mail.K9MailLib.LOG_TAG;
 
-public class Address implements Serializable {
+public class Address {
     private static final Pattern ATOM = Pattern.compile("^(?:[a-zA-Z0-9!#$%&'*+\\-/=?^_`{|}~]|\\s)+$");
 
     /**
@@ -303,17 +301,16 @@ public class Address implements Serializable {
      * double quote character to start and end if it's not already there.
      * sample -> "sample"
      * "sample" -> "sample"
-     * ""sample"" -> ""sample""
+     * ""sample"" -> "sample"
      * "sample"" -> "sample"
      * sa"mp"le -> "sa"mp"le"
      * "sa"mp"le" -> "sa"mp"le"
      * (empty string) -> ""
-     * " -> """
+     * " -> ""
      * @param s
      * @return
      */
-    @VisibleForTesting
-    static String quoteString(String s) {
+    private static String quoteString(String s) {
         if (s == null) {
             return null;
         }

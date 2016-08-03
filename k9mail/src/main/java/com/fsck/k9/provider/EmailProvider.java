@@ -143,7 +143,6 @@ public class EmailProvider extends ContentProvider {
         public static final String FLAGS = "flags";
         public static final String ATTACHMENT_COUNT = "attachment_count";
         public static final String FOLDER_ID = "folder_id";
-        public static final String PREVIEW_TYPE = "preview_type";
         public static final String PREVIEW = "preview";
         public static final String READ = "read";
         public static final String FLAGGED = "flagged";
@@ -304,12 +303,14 @@ public class EmailProvider extends ContentProvider {
 
                     String where;
                     if (TextUtils.isEmpty(selection)) {
-                        where = InternalMessageColumns.DELETED + " = 0 AND " +
-                                InternalMessageColumns.EMPTY + " = 0";
+                        where = InternalMessageColumns.DELETED + "=0 AND (" +
+                                InternalMessageColumns.EMPTY + " IS NULL OR " +
+                                InternalMessageColumns.EMPTY + "!=1)";
                     } else {
                         where = "(" + selection + ") AND " +
-                                InternalMessageColumns.DELETED + " = 0 AND " +
-                                InternalMessageColumns.EMPTY + " = 0";
+                                InternalMessageColumns.DELETED + "=0 AND (" +
+                                InternalMessageColumns.EMPTY + " IS NULL OR " +
+                                InternalMessageColumns.EMPTY + "!=1)";
                     }
 
                     final Cursor cursor;
@@ -403,23 +404,19 @@ public class EmailProvider extends ContentProvider {
 
                     query.append(") a ");
 
-                    query.append("JOIN " + THREADS_TABLE + " t " +
+                    query.append("LEFT JOIN " + THREADS_TABLE + " t " +
                             "ON (t." + ThreadColumns.ROOT + " = a.thread_root) " +
-                            "JOIN " + MESSAGES_TABLE + " m " +
-                            "ON (m." + MessageColumns.ID + " = t." + ThreadColumns.MESSAGE_ID + " AND " +
-                            "m." + InternalMessageColumns.EMPTY + "=0 AND " +
-                            "m." + InternalMessageColumns.DELETED + "=0 AND " +
-                            "m." + MessageColumns.DATE + " = a." + MessageColumns.DATE +
+                            "LEFT JOIN " + MESSAGES_TABLE + " m " +
+                            "ON (m." + MessageColumns.ID + " = t." + ThreadColumns.MESSAGE_ID +
                             ") ");
 
                     if (Utility.arrayContainsAny(projection, (Object[]) FOLDERS_COLUMNS)) {
-                        query.append("JOIN " + FOLDERS_TABLE + " f " +
+                        query.append("LEFT JOIN " + FOLDERS_TABLE + " f " +
                                 "ON (m." + MessageColumns.FOLDER_ID + " = f." + FolderColumns.ID +
                                 ") ");
                     }
 
-                    query.append(" GROUP BY " + ThreadColumns.ROOT);
-
+                    query.append("WHERE m." + MessageColumns.DATE + " = a." + MessageColumns.DATE);
                     if (!TextUtils.isEmpty(sortOrder)) {
                         query.append(" ORDER BY ");
                         query.append(SqlQueryBuilder.addPrefixToSelection(
@@ -460,23 +457,19 @@ public class EmailProvider extends ContentProvider {
 
         query.append(
                 " FROM " + MESSAGES_TABLE + " m " +
-                "JOIN " + THREADS_TABLE + " t " +
+                "LEFT JOIN " + THREADS_TABLE + " t " +
                 "ON (t." + ThreadColumns.MESSAGE_ID + " = m." + MessageColumns.ID + ")");
 
         if (Utility.arrayContainsAny(projection, (Object[]) FOLDERS_COLUMNS)) {
-            query.append(" JOIN " + FOLDERS_TABLE + " f " +
+            query.append("LEFT JOIN " + FOLDERS_TABLE + " f " +
                     "ON (m." + MessageColumns.FOLDER_ID + " = f." + FolderColumns.ID +
                     ")");
         }
 
-        query.append(" WHERE (t." + ThreadColumns.ROOT + " IN (" +
-                "SELECT " + ThreadColumns.ROOT + " " +
-                "FROM " + MESSAGES_TABLE + " m " +
-                "JOIN " + THREADS_TABLE + " t " +
-                "ON (t." + ThreadColumns.MESSAGE_ID + " = m." + MessageColumns.ID + ") " +
-                "WHERE " +
-                "m." + InternalMessageColumns.EMPTY + " = 0 AND " +
-                "m." + InternalMessageColumns.DELETED + " = 0)");
+        query.append(" WHERE " +
+                "(" + InternalMessageColumns.DELETED + " = 0 AND " +
+                "(" + InternalMessageColumns.EMPTY + " IS NULL OR " +
+                InternalMessageColumns.EMPTY + " != 1))");
 
 
         if (!TextUtils.isEmpty(selection)) {
@@ -484,11 +477,6 @@ public class EmailProvider extends ContentProvider {
             query.append(selection);
             query.append(")");
         }
-
-        query.append(
-                ") AND " +
-                InternalMessageColumns.DELETED + " = 0 AND " +
-                InternalMessageColumns.EMPTY + " = 0");
 
         query.append(" GROUP BY t." + ThreadColumns.ROOT);
     }
@@ -534,8 +522,9 @@ public class EmailProvider extends ContentProvider {
 
                     query.append("WHERE " +
                             ThreadColumns.ROOT + " = ? AND " +
-                            InternalMessageColumns.DELETED + " = 0 AND " +
-                            InternalMessageColumns.EMPTY + " = 0");
+                            InternalMessageColumns.DELETED + " = 0 AND (" +
+                            InternalMessageColumns.EMPTY + " IS NULL OR " +
+                            InternalMessageColumns.EMPTY + " != 1)");
 
                     query.append(" ORDER BY ");
                     query.append(SqlQueryBuilder.addPrefixToSelection(FIXUP_MESSAGES_COLUMNS,
@@ -592,7 +581,7 @@ public class EmailProvider extends ContentProvider {
         }
 
         // WHERE clause
-        sql.append(" WHERE (deleted = 0 AND empty = 0)");
+        sql.append(" WHERE (deleted=0 AND (empty IS NULL OR empty!=1))");
         if (!TextUtils.isEmpty(selection)) {
             sql.append(" AND (");
             sql.append(selection);
@@ -644,7 +633,7 @@ public class EmailProvider extends ContentProvider {
     }
 
     /**
-     * This class is needed to make {@link android.support.v4.widget.CursorAdapter} work with our database schema.
+     * This class is needed to make {@link CursorAdapter} work with our database schema.
      *
      * <p>
      * {@code CursorAdapter} requires a column named {@code "_id"} containing a stable id. We use

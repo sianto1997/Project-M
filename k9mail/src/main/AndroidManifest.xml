@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest
+    package="com.fsck.k9"
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:versionCode="1"
-    android:versionName="0.1.0"
-    package="com.fsck.k9">
+    android:versionName="0.1.0">
 
     <uses-feature
         android:name="android.hardware.touchscreen"
@@ -66,8 +66,7 @@
         android:allowTaskReparenting="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:theme="@style/Theme.K9.Startup"
-        android:allowBackup="false">
+        android:theme="@style/Theme.K9.Startup">
 
         <meta-data
             android:name="android.app.default_searchable"
@@ -84,6 +83,13 @@
 
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <data android:mimeType="application/x-k9settings"/>
+
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
             </intent-filter>
         </activity>
 
@@ -363,7 +369,7 @@
             android:enabled="true"/>
 
         <service
-            android:name=".notification.NotificationActionService"
+            android:name=".service.NotificationActionService"
             android:enabled="true"/>
 
         <service
@@ -410,14 +416,14 @@
             android:exported="false"/>
 
         <provider
-            android:name=".provider.DecryptedFileProvider"
-            android:authorities="${applicationId}.decryptedfileprovider"
+            android:name=".provider.K9FileProvider"
+            android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
 
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/decrypted_file_provider_paths" />
+                android:resource="@xml/allowed_file_provider_paths" />
 
         </provider>
 

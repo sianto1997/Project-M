@@ -2,10 +2,13 @@ package com.fsck.k9.helper;
 
 import android.text.*;
 import android.text.Html.TagHandler;
+import android.util.Log;
 import com.fsck.k9.K9;
 
 import org.xml.sax.XMLReader;
 
+import java.io.IOException;
+import java.io.StringReader;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Locale;
@@ -208,23 +211,29 @@ public class HtmlConverter {
         // Encode HTML entities to make sure we don't display something evil.
         text = TextUtils.htmlEncode(text);
 
+        StringReader reader = new StringReader(text);
         StringBuilder buff = new StringBuilder(text.length() + TEXT_TO_HTML_EXTRA_BUFFER_LENGTH);
 
         buff.append(htmlifyMessageHeader());
 
-        for (int index = 0; index < text.length(); index++) {
-            char c = text.charAt(index);
-            switch (c) {
-            case '\n':
-                // pine treats <br> as two newlines, but <br/> as one newline.  Use <br/> so our messages aren't
-                // doublespaced.
-                buff.append("<br />");
-                break;
-            case '\r':
-                break;
-            default:
-                buff.append(c);
-            }//switch
+        int c;
+        try {
+            while ((c = reader.read()) != -1) {
+                switch (c) {
+                case '\n':
+                    // pine treats <br> as two newlines, but <br/> as one newline.  Use <br/> so our messages aren't
+                    // doublespaced.
+                    buff.append("<br />");
+                    break;
+                case '\r':
+                    break;
+                default:
+                    buff.append((char)c);
+                }//switch
+            }
+        } catch (IOException e) {
+            //Should never happen
+            Log.e(K9.LOG_TAG, "Could not read string to convert text to HTML:", e);
         }
 
         buff.append(htmlifyMessageFooter());
@@ -265,54 +274,60 @@ public class HtmlConverter {
         if (text.length() > MAX_SMART_HTMLIFY_MESSAGE_LENGTH) {
             return simpleTextToHtml(text);
         }
+        StringReader reader = new StringReader(text);
         StringBuilder buff = new StringBuilder(text.length() + TEXT_TO_HTML_EXTRA_BUFFER_LENGTH);
         boolean isStartOfLine = true;  // Are we currently at the start of a line?
         int spaces = 0;
         int quoteDepth = 0; // Number of DIVs deep we are.
         int quotesThisLine = 0; // How deep we should be quoting for this line.
-        for (int index = 0; index < text.length(); index++) {
-            char c = text.charAt(index);
-            if (isStartOfLine) {
-                switch (c) {
-                case ' ':
-                    spaces++;
-                    break;
-                case '>':
-                    quotesThisLine++;
-                    spaces = 0;
-                    break;
-                case '\n':
-                    appendbq(buff, quotesThisLine, quoteDepth);
-                    quoteDepth = quotesThisLine;
+        try {
+            int c;
+            while ((c = reader.read()) != -1) {
+                if (isStartOfLine) {
+                    switch (c) {
+                    case ' ':
+                        spaces++;
+                        break;
+                    case '>':
+                        quotesThisLine++;
+                        spaces = 0;
+                        break;
+                    case '\n':
+                        appendbq(buff, quotesThisLine, quoteDepth);
+                        quoteDepth = quotesThisLine;
 
-                    appendsp(buff, spaces);
-                    spaces = 0;
+                        appendsp(buff, spaces);
+                        spaces = 0;
 
+                        appendchar(buff, c);
+                        isStartOfLine = true;
+                        quotesThisLine = 0;
+                        break;
+                    default:
+                        isStartOfLine = false;
+
+                        appendbq(buff, quotesThisLine, quoteDepth);
+                        quoteDepth = quotesThisLine;
+
+                        appendsp(buff, spaces);
+                        spaces = 0;
+
+                        appendchar(buff, c);
+                        isStartOfLine = false;
+                        break;
+                    }
+                }
+                else {
                     appendchar(buff, c);
-                    isStartOfLine = true;
-                    quotesThisLine = 0;
-                    break;
-                default:
-                    isStartOfLine = false;
-
-                    appendbq(buff, quotesThisLine, quoteDepth);
-                    quoteDepth = quotesThisLine;
-
-                    appendsp(buff, spaces);
-                    spaces = 0;
-
-                    appendchar(buff, c);
-                    isStartOfLine = false;
-                    break;
+                    if (c == '\n') {
+                        isStartOfLine = true;
+                        quotesThisLine = 0;
+                    }
                 }
             }
-            else {
-                appendchar(buff, c);
-                if (c == '\n') {
-                    isStartOfLine = true;
-                    quotesThisLine = 0;
-                }
-            }
+        } catch (IOException e) {
+            //Should never happen
+            Log.e(K9.LOG_TAG, "Could not read string to convert text to HTML:", e);
         }
         // Close off any quotes we may have opened.
         if (quoteDepth > 0) {
@@ -1323,31 +1338,6 @@ public class HtmlConverter {
         return "</pre>";
     }
 
-    public static String wrapStatusMessage(CharSequence status) {
-        return wrapMessageContent("<div style=\"text-align:center; color: grey;\">" + status + "</div>");
-    }
-
-    public static String wrapMessageContent(CharSequence messageContent) {
-        // Include a meta tag so the WebView will not use a fixed viewport width of 980 px
-        return "<html><head><meta name=\"viewport\" content=\"width=device-width\"/>" +
-                HtmlConverter.cssStyleTheme() +
-                HtmlConverter.cssStylePre() +
-                "</head><body>" +
-                messageContent +
-                "</body></html>";
-    }
-
-    private static String cssStyleTheme() {
-        if (K9.getK9MessageViewTheme() == K9.Theme.DARK)  {
-            return "<style type=\"text/css\">" +
-                    "* { background: black ! important; color: #F3F3F3 !important }" +
-                    ":link, :link * { color: #CCFF33 !important }" +
-                    ":visited, :visited * { color: #551A8B !important }</style> ";
-        } else {
-            return "";
-        }
-    }
-
     /**
      * Dynamically generate a CSS style for {@code <pre>} elements.
      *
@@ -1360,7 +1350,7 @@ public class HtmlConverter {
      *      A {@code <style>} element that can be dynamically included in the HTML
      *      {@code <head>} element when messages are displayed.
      */
-    private static String cssStylePre() {
+    public static String cssStylePre() {
         final String font = K9.messageViewFixedWidthFont()
                 ? "monospace"
                 : "sans-serif";

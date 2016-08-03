@@ -1,6 +1,5 @@
 package com.fsck.k9.provider;
 
-import android.annotation.TargetApi;
 import android.app.Application;
 import android.content.ContentProvider;
 import android.content.ContentResolver;
@@ -16,7 +15,6 @@ import android.database.DataSetObserver;
 import android.database.MatrixCursor;
 import android.net.Uri;
 import android.os.Binder;
-import android.os.Build;
 import android.os.Bundle;
 import android.provider.BaseColumns;
 import android.util.Log;
@@ -32,6 +30,7 @@ import com.fsck.k9.controller.MessagingController;
 import com.fsck.k9.controller.MessagingListener;
 import com.fsck.k9.helper.MessageHelper;
 import com.fsck.k9.mail.Flag;
+import com.fsck.k9.mail.Folder;
 import com.fsck.k9.mail.Message;
 import com.fsck.k9.mail.MessagingException;
 import com.fsck.k9.mailstore.LocalFolder;
@@ -716,12 +715,6 @@ public class MessageProvider extends ContentProvider {
             return mCursor.getWantsAllOnMoveCalls();
         }
 
-        @TargetApi(Build.VERSION_CODES.M)
-        @Override
-        public void setExtras(Bundle extras) {
-            mCursor.setExtras(extras);
-        }
-
         @Override
         public void setExtras(Bundle extras) {
 
@@ -938,7 +931,7 @@ public class MessageProvider extends ContentProvider {
 
             for (final LocalMessage message : messages) {
                 final MessageInfoHolder messageInfoHolder = new MessageInfoHolder();
-                final LocalFolder messageFolder = message.getFolder();
+                final Folder messageFolder = message.getFolder();
 
                 final Account messageAccount = messageInfoHolder.message.getAccount();
                 helper.populate(messageInfoHolder, message, new FolderInfoHolder(context,

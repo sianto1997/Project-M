@@ -3,193 +3,128 @@ package com.fsck.k9.ui.crypto;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.annotation.WorkerThread;
+import android.content.IntentSender.SendIntentException;
+import android.os.AsyncTask;
 import android.util.Log;
 
 import com.fsck.k9.Account;
+import com.fsck.k9.Identity;
 import com.fsck.k9.K9;
 import com.fsck.k9.crypto.MessageDecryptVerifier;
-import com.fsck.k9.mail.Address;
+import com.fsck.k9.crypto.OpenPgpApiHelper;
+import com.fsck.k9.helper.IdentityHelper;
 import com.fsck.k9.mail.Body;
 import com.fsck.k9.mail.BodyPart;
-import com.fsck.k9.mail.Flag;
 import com.fsck.k9.mail.MessagingException;
 import com.fsck.k9.mail.Multipart;
 import com.fsck.k9.mail.Part;
 import com.fsck.k9.mail.internet.MessageExtractor;
 import com.fsck.k9.mail.internet.MimeBodyPart;
-import com.fsck.k9.mail.internet.MimeMultipart;
-import com.fsck.k9.mail.internet.SizeAware;
 import com.fsck.k9.mail.internet.TextBody;
-import com.fsck.k9.mailstore.CryptoResultAnnotation;
-import com.fsck.k9.mailstore.CryptoResultAnnotation.CryptoError;
+import com.fsck.k9.mailstore.DecryptStreamParser;
 import com.fsck.k9.mailstore.LocalMessage;
 import com.fsck.k9.mailstore.MessageHelper;
-import com.fsck.k9.mailstore.MimePartStreamParser;
-import com.fsck.k9.mailstore.util.FileFactory;
-import com.fsck.k9.provider.DecryptedFileProvider;
-import org.apache.commons.io.IOUtils;
-import org.openintents.openpgp.IOpenPgpService2;
-import org.openintents.openpgp.OpenPgpDecryptionResult;
+import com.fsck.k9.mailstore.OpenPgpResultAnnotation;
+import com.fsck.k9.mailstore.OpenPgpResultAnnotation.CryptoError;
+import org.openintents.openpgp.IOpenPgpService;
 import org.openintents.openpgp.OpenPgpError;
 import org.openintents.openpgp.OpenPgpSignatureResult;
 import org.openintents.openpgp.util.OpenPgpApi;
-import org.openintents.openpgp.util.OpenPgpApi.CancelableBackgroundOperation;
-import org.openintents.openpgp.util.OpenPgpApi.IOpenPgpSinkResultCallback;
-import org.openintents.openpgp.util.OpenPgpApi.OpenPgpDataSink;
-import org.openintents.openpgp.util.OpenPgpApi.OpenPgpDataSource;
+import org.openintents.openpgp.util.OpenPgpApi.IOpenPgpCallback;
 import org.openintents.openpgp.util.OpenPgpServiceConnection;
 import org.openintents.openpgp.util.OpenPgpServiceConnection.OnBound;
-import org.openintents.openpgp.util.OpenPgpUtils;
 
 
 public class MessageCryptoHelper {
+    private static final int REQUEST_CODE_CRYPTO = 1000;
     private static final int INVALID_OPENPGP_RESULT_CODE = -1;
     private static final MimeBodyPart NO_REPLACEMENT_PART = null;
-    public static final int REQUEST_CODE_USER_INTERACTION = 124;
-    public static final int PROGRESS_SIZE_THRESHOLD = 4096;
 
 
     private final Context context;
-    private final String openPgpProviderPackage;
-    private final Object callbackLock = new Object();
+    private final Activity activity;
+    private final MessageCryptoCallback callback;
+    private final Account account;
+    private LocalMessage message;
 
-    @Nullable
-    private MessageCryptoCallback callback;
-
-    private LocalMessage currentMessage;
-    private OpenPgpDecryptionResult cachedDecryptionResult;
-    private MessageCryptoAnnotations queuedResult;
-    private PendingIntent queuedPendingIntent;
-
-
-    private MessageCryptoAnnotations messageAnnotations;
-    private Deque<CryptoPart> partsToDecryptOrVerify = new ArrayDeque<>();
+    private Deque<CryptoPart> partsToDecryptOrVerify = new ArrayDeque<CryptoPart>();
+    private OpenPgpApi openPgpApi;
     private CryptoPart currentCryptoPart;
     private Intent currentCryptoResult;
-    private Intent userInteractionResultIntent;
-    private boolean secondPassStarted;
-    private CancelableBackgroundOperation cancelableBackgroundOperation;
-    private boolean isCancelled;
 
-    private OpenPgpApi openPgpApi;
-    private OpenPgpServiceConnection openPgpServiceConnection;
+    private MessageCryptoAnnotations messageAnnotations;
 
 
-    public MessageCryptoHelper(Context context, String openPgpProviderPackage) {
-        this.context = context.getApplicationContext();
-        this.openPgpProviderPackage = openPgpProviderPackage;
+    public MessageCryptoHelper(Activity activity, Account account, MessageCryptoCallback callback) {
+        this.context = activity.getApplicationContext();
+        this.activity = activity;
+        this.callback = callback;
+        this.account = account;
 
-        if (openPgpProviderPackage == null || Account.NO_OPENPGP_PROVIDER.equals(openPgpProviderPackage)) {
-            throw new IllegalStateException("MessageCryptoHelper must only be called with a openpgp provider!");
-        }
+        this.messageAnnotations = new MessageCryptoAnnotations();
     }
 
-    public void asyncStartOrResumeProcessingMessage(LocalMessage message, MessageCryptoCallback callback,
-            OpenPgpDecryptionResult cachedDecryptionResult) {
-        if (this.currentMessage != null) {
-            reattachCallback(message, callback);
+    public void decryptOrVerifyMessagePartsIfNecessary(LocalMessage message) {
+        this.message = message;
+
+        if (!account.isOpenPgpProviderConfigured()) {
+            returnResultToFragment();
             return;
         }
 
-        this.messageAnnotations = new MessageCryptoAnnotations();
-        this.currentMessage = message;
-        this.cachedDecryptionResult = cachedDecryptionResult;
-        this.callback = callback;
+        List<Part> encryptedParts = MessageDecryptVerifier.findEncryptedParts(message);
+        processFoundParts(encryptedParts, CryptoPartType.ENCRYPTED, CryptoError.ENCRYPTED_BUT_INCOMPLETE,
+                MessageHelper.createEmptyPart());
 
-        runFirstPass();
-    }
+        List<Part> signedParts = MessageDecryptVerifier.findSignedParts(message);
+        processFoundParts(signedParts, CryptoPartType.SIGNED, CryptoError.SIGNED_BUT_INCOMPLETE, NO_REPLACEMENT_PART);
 
-    private void runFirstPass() {
-        List<Part> encryptedParts = MessageDecryptVerifier.findEncryptedParts(currentMessage);
-        processFoundEncryptedParts(encryptedParts);
-
-        decryptOrVerifyNextPart();
-    }
-
-    private void runSecondPass() {
-        List<Part> signedParts = MessageDecryptVerifier.findSignedParts(currentMessage, messageAnnotations);
-        processFoundSignedParts(signedParts);
-
-        List<Part> inlineParts = MessageDecryptVerifier.findPgpInlineParts(currentMessage);
+        List<Part> inlineParts = MessageDecryptVerifier.findPgpInlineParts(message);
         addFoundInlinePgpParts(inlineParts);
 
         decryptOrVerifyNextPart();
     }
 
-    private void processFoundEncryptedParts(List<Part> foundParts) {
+    private void processFoundParts(List<Part> foundParts, CryptoPartType cryptoPartType, CryptoError errorIfIncomplete,
+            MimeBodyPart replacementPart) {
         for (Part part : foundParts) {
-            if (!MessageHelper.isCompletePartAvailable(part)) {
-                addErrorAnnotation(part, CryptoError.OPENPGP_ENCRYPTED_BUT_INCOMPLETE, MessageHelper.createEmptyPart());
-                continue;
-            }
-            if (MessageDecryptVerifier.isPgpMimeEncryptedOrSignedPart(part)) {
-                CryptoPart cryptoPart = new CryptoPart(CryptoPartType.PGP_ENCRYPTED, part);
+            if (MessageHelper.isCompletePartAvailable(part)) {
+                CryptoPart cryptoPart = new CryptoPart(cryptoPartType, part);
                 partsToDecryptOrVerify.add(cryptoPart);
-                continue;
+            } else {
+                addErrorAnnotation(part, errorIfIncomplete, replacementPart);
             }
-            addErrorAnnotation(part, CryptoError.ENCRYPTED_BUT_UNSUPPORTED, MessageHelper.createEmptyPart());
         }
     }
 
-    private void processFoundSignedParts(List<Part> foundParts) {
-        for (Part part : foundParts) {
-            if (!MessageHelper.isCompletePartAvailable(part)) {
-                MimeBodyPart replacementPart = getMultipartSignedContentPartIfAvailable(part);
-                addErrorAnnotation(part, CryptoError.OPENPGP_SIGNED_BUT_INCOMPLETE, replacementPart);
-                continue;
-            }
-            if (MessageDecryptVerifier.isPgpMimeEncryptedOrSignedPart(part)) {
-                CryptoPart cryptoPart = new CryptoPart(CryptoPartType.PGP_SIGNED, part);
-                partsToDecryptOrVerify.add(cryptoPart);
-                continue;
-            }
-            MimeBodyPart replacementPart = getMultipartSignedContentPartIfAvailable(part);
-            addErrorAnnotation(part, CryptoError.SIGNED_BUT_UNSUPPORTED, replacementPart);
-        }
-    }
-
-    private void addErrorAnnotation(Part part, CryptoError error, MimeBodyPart replacementPart) {
-        CryptoResultAnnotation annotation = CryptoResultAnnotation.createErrorAnnotation(error, replacementPart);
+    private void addErrorAnnotation(Part part, CryptoError error, MimeBodyPart outputData) {
+        OpenPgpResultAnnotation annotation = new OpenPgpResultAnnotation();
+        annotation.setErrorType(error);
+        annotation.setOutputData(outputData);
         messageAnnotations.put(part, annotation);
     }
 
     private void addFoundInlinePgpParts(List<Part> foundParts) {
         for (Part part : foundParts) {
-            if (!currentMessage.getFlags().contains(Flag.X_DOWNLOADED_FULL)) {
-                if (MessageDecryptVerifier.isPartPgpInlineEncrypted(part)) {
-                    addErrorAnnotation(part, CryptoError.OPENPGP_ENCRYPTED_BUT_INCOMPLETE, NO_REPLACEMENT_PART);
-                } else {
-                    MimeBodyPart replacementPart = extractClearsignedTextReplacementPart(part);
-                    addErrorAnnotation(part, CryptoError.OPENPGP_SIGNED_BUT_INCOMPLETE, replacementPart);
-                }
-                continue;
-            }
-
-            CryptoPart cryptoPart = new CryptoPart(CryptoPartType.PGP_INLINE, part);
+            CryptoPart cryptoPart = new CryptoPart(CryptoPartType.INLINE_PGP, part);
             partsToDecryptOrVerify.add(cryptoPart);
         }
     }
 
     private void decryptOrVerifyNextPart() {
-        if (isCancelled) {
-            return;
-        }
-
         if (partsToDecryptOrVerify.isEmpty()) {
-            runSecondPassOrReturnResultToFragment();
+            returnResultToFragment();
             return;
         }
 
@@ -210,10 +145,11 @@ public class MessageCryptoHelper {
     }
 
     private void connectToCryptoProviderService() {
-        openPgpServiceConnection = new OpenPgpServiceConnection(context, openPgpProviderPackage,
+        String openPgpProvider = account.getOpenPgpProvider();
+        new OpenPgpServiceConnection(context, openPgpProvider,
                 new OnBound() {
                     @Override
-                    public void onBound(IOpenPgpService2 service) {
+                    public void onBound(IOpenPgpService service) {
                         openPgpApi = new OpenPgpApi(context, service);
 
                         decryptOrVerifyNextPart();
@@ -221,50 +157,31 @@ public class MessageCryptoHelper {
 
                     @Override
                     public void onError(Exception e) {
-                        // TODO actually handle (hand to ui, offer retry?)
                         Log.e(K9.LOG_TAG, "Couldn't connect to OpenPgpService", e);
                     }
-                });
-        openPgpServiceConnection.bindToService();
+                }).bindToService();
     }
 
     private void decryptOrVerifyPart(CryptoPart cryptoPart) {
         currentCryptoPart = cryptoPart;
-        Intent decryptIntent = userInteractionResultIntent;
-        userInteractionResultIntent = null;
-        if (decryptIntent == null) {
-            decryptIntent = getDecryptionIntent();
-        }
-        decryptVerify(decryptIntent);
-    }
-
-    @NonNull
-    private Intent getDecryptionIntent() {
-        Intent decryptIntent = new Intent(OpenPgpApi.ACTION_DECRYPT_VERIFY);
-
-        Address[] from = currentMessage.getFrom();
-        if (from.length > 0) {
-            decryptIntent.putExtra(OpenPgpApi.EXTRA_SENDER_ADDRESS, from[0].getAddress());
-        }
-
-        decryptIntent.putExtra(OpenPgpApi.EXTRA_DECRYPTION_RESULT, cachedDecryptionResult);
-
-        return decryptIntent;
+        decryptVerify(new Intent());
     }
 
     private void decryptVerify(Intent intent) {
+        intent.setAction(OpenPgpApi.ACTION_DECRYPT_VERIFY);
+
         try {
             CryptoPartType cryptoPartType = currentCryptoPart.type;
             switch (cryptoPartType) {
-                case PGP_SIGNED: {
+                case SIGNED: {
                     callAsyncDetachedVerify(intent);
                     return;
                 }
-                case PGP_ENCRYPTED: {
+                case ENCRYPTED: {
                     callAsyncDecrypt(intent);
                     return;
                 }
-                case PGP_INLINE: {
+                case INLINE_PGP: {
                     callAsyncInlineOperation(intent);
                     return;
                 }
@@ -279,186 +196,155 @@ public class MessageCryptoHelper {
     }
 
     private void callAsyncInlineOperation(Intent intent) throws IOException {
-        OpenPgpDataSource dataSource = getDataSourceForEncryptedOrInlineData();
-        OpenPgpDataSink<MimeBodyPart> dataSink = getDataSinkForDecryptedInlineData();
+        PipedInputStream pipedInputStream = getPipedInputStreamForEncryptedOrInlineData();
+        final ByteArrayOutputStream decryptedOutputStream = new ByteArrayOutputStream();
 
-        cancelableBackgroundOperation = openPgpApi.executeApiAsync(intent, dataSource, dataSink,
-                new IOpenPgpSinkResultCallback<MimeBodyPart>() {
+        openPgpApi.executeApiAsync(intent, pipedInputStream, decryptedOutputStream, new IOpenPgpCallback() {
             @Override
-            public void onProgress(int current, int max) {
-                Log.d(K9.LOG_TAG, "received progress status: " + current + " / " + max);
-                callbackProgress(current, max);
-            }
-
-            @Override
-            public void onReturn(Intent result, MimeBodyPart bodyPart) {
-                cancelableBackgroundOperation = null;
+            public void onReturn(Intent result) {
                 currentCryptoResult = result;
-                onCryptoOperationReturned(bodyPart);
-            }
-        });
-    }
 
-    public void cancelIfRunning() {
-        detachCallback();
-        isCancelled = true;
-        if (cancelableBackgroundOperation != null) {
-            cancelableBackgroundOperation.cancelOperation();
-        }
-    }
-
-    private OpenPgpDataSink<MimeBodyPart> getDataSinkForDecryptedInlineData() {
-        return new OpenPgpDataSink<MimeBodyPart>() {
-            @Override
-            public MimeBodyPart processData(InputStream is) throws IOException {
+                MimeBodyPart decryptedPart = null;
                 try {
-                    ByteArrayOutputStream decryptedByteOutputStream = new ByteArrayOutputStream();
-                    IOUtils.copy(is, decryptedByteOutputStream);
-                    TextBody body = new TextBody(new String(decryptedByteOutputStream.toByteArray()));
-                    return new MimeBodyPart(body, "text/plain");
+                    TextBody body = new TextBody(new String(decryptedOutputStream.toByteArray()));
+                    decryptedPart = new MimeBodyPart(body, "text/plain");
                 } catch (MessagingException e) {
                     Log.e(K9.LOG_TAG, "MessagingException", e);
                 }
 
-                return null;
+                onCryptoOperationReturned(decryptedPart);
             }
-        };
+        });
     }
 
     private void callAsyncDecrypt(Intent intent) throws IOException {
-        OpenPgpDataSource dataSource = getDataSourceForEncryptedOrInlineData();
-        OpenPgpDataSink<MimeBodyPart> openPgpDataSink = getDataSinkForDecryptedData();
+        final CountDownLatch latch = new CountDownLatch(1);
+        PipedInputStream pipedInputStream = getPipedInputStreamForEncryptedOrInlineData();
+        PipedOutputStream decryptedOutputStream = getPipedOutputStreamForDecryptedData(latch);
 
-        cancelableBackgroundOperation = openPgpApi.executeApiAsync(intent, dataSource, openPgpDataSink,
-                new IOpenPgpSinkResultCallback<MimeBodyPart>() {
+        openPgpApi.executeApiAsync(intent, pipedInputStream, decryptedOutputStream, new IOpenPgpCallback() {
             @Override
-            public void onReturn(Intent result, MimeBodyPart decryptedPart) {
-                cancelableBackgroundOperation = null;
+            public void onReturn(Intent result) {
                 currentCryptoResult = result;
-                onCryptoOperationReturned(decryptedPart);
-            }
-
-            @Override
-            public void onProgress(int current, int max) {
-                Log.d(K9.LOG_TAG, "received progress status: " + current + " / " + max);
-                callbackProgress(current, max);
+                latch.countDown();
             }
         });
     }
 
     private void callAsyncDetachedVerify(Intent intent) throws IOException, MessagingException {
-        OpenPgpDataSource dataSource = getDataSourceForSignedData();
+        PipedInputStream pipedInputStream = getPipedInputStreamForSignedData();
 
         byte[] signatureData = MessageDecryptVerifier.getSignatureData(currentCryptoPart.part);
         intent.putExtra(OpenPgpApi.EXTRA_DETACHED_SIGNATURE, signatureData);
 
-        openPgpApi.executeApiAsync(intent, dataSource, new IOpenPgpSinkResultCallback<Void>() {
+        openPgpApi.executeApiAsync(intent, pipedInputStream, null, new IOpenPgpCallback() {
             @Override
-            public void onReturn(Intent result, Void dummy) {
-                cancelableBackgroundOperation = null;
+            public void onReturn(Intent result) {
                 currentCryptoResult = result;
                 onCryptoOperationReturned(null);
-            }
-
-            @Override
-            public void onProgress(int current, int max) {
-                Log.d(K9.LOG_TAG, "received progress status: " + current + " / " + max);
-                callbackProgress(current, max);
             }
         });
     }
 
-    private OpenPgpDataSource getDataSourceForSignedData() throws IOException {
-        return new OpenPgpDataSource() {
+    private PipedInputStream getPipedInputStreamForSignedData() throws IOException {
+        PipedInputStream pipedInputStream = new PipedInputStream();
+
+        final PipedOutputStream out = new PipedOutputStream(pipedInputStream);
+        new Thread(new Runnable() {
             @Override
-            public void writeTo(OutputStream os) throws IOException {
+            public void run() {
                 try {
                     Multipart multipartSignedMultipart = (Multipart) currentCryptoPart.part.getBody();
                     BodyPart signatureBodyPart = multipartSignedMultipart.getBodyPart(0);
                     Log.d(K9.LOG_TAG, "signed data type: " + signatureBodyPart.getMimeType());
-                    signatureBodyPart.writeTo(os);
-                } catch (MessagingException e) {
+                    signatureBodyPart.writeTo(out);
+                } catch (Exception e) {
                     Log.e(K9.LOG_TAG, "Exception while writing message to crypto provider", e);
-                }
-            }
-        };
-    }
-
-    private OpenPgpDataSource getDataSourceForEncryptedOrInlineData() throws IOException {
-        return new OpenPgpApi.OpenPgpDataSource() {
-            @Override
-            public Long getSizeForProgress() {
-                Part part = currentCryptoPart.part;
-                CryptoPartType cryptoPartType = currentCryptoPart.type;
-                Body body;
-                if (cryptoPartType == CryptoPartType.PGP_ENCRYPTED) {
-                    Multipart multipartEncryptedMultipart = (Multipart) part.getBody();
-                    BodyPart encryptionPayloadPart = multipartEncryptedMultipart.getBodyPart(1);
-                    body = encryptionPayloadPart.getBody();
-                } else if (cryptoPartType == CryptoPartType.PGP_INLINE) {
-                    body = part.getBody();
-                } else {
-                    throw new IllegalStateException("part to stream must be encrypted or inline!");
-                }
-                if (body instanceof SizeAware) {
-                    long bodySize = ((SizeAware) body).getSize();
-                    if (bodySize > PROGRESS_SIZE_THRESHOLD) {
-                        return bodySize;
+                } finally {
+                    try {
+                        out.close();
+                    } catch (IOException e) {
+                        // don't care
                     }
                 }
-                return null;
             }
+        }).start();
 
+        return pipedInputStream;
+    }
+
+    private PipedInputStream getPipedInputStreamForEncryptedOrInlineData() throws IOException {
+        PipedInputStream pipedInputStream = new PipedInputStream();
+
+        final PipedOutputStream out = new PipedOutputStream(pipedInputStream);
+        new Thread(new Runnable() {
             @Override
-            @WorkerThread
-            public void writeTo(OutputStream os) throws IOException {
+            public void run() {
                 try {
                     Part part = currentCryptoPart.part;
                     CryptoPartType cryptoPartType = currentCryptoPart.type;
-                    if (cryptoPartType == CryptoPartType.PGP_ENCRYPTED) {
+                    if (cryptoPartType == CryptoPartType.ENCRYPTED) {
                         Multipart multipartEncryptedMultipart = (Multipart) part.getBody();
                         BodyPart encryptionPayloadPart = multipartEncryptedMultipart.getBodyPart(1);
                         Body encryptionPayloadBody = encryptionPayloadPart.getBody();
-                        encryptionPayloadBody.writeTo(os);
-                    } else if (cryptoPartType == CryptoPartType.PGP_INLINE) {
+                        encryptionPayloadBody.writeTo(out);
+                    } else if (cryptoPartType == CryptoPartType.INLINE_PGP) {
                         String text = MessageExtractor.getTextFromPart(part);
-                        os.write(text.getBytes());
+                        out.write(text.getBytes());
                     } else {
-                        throw new IllegalStateException("part to stream must be encrypted or inline!");
+                        Log.wtf(K9.LOG_TAG, "No suitable data to stream found!");
                     }
-                } catch (MessagingException e) {
-                    Log.e(K9.LOG_TAG, "MessagingException while writing message to crypto provider", e);
+                } catch (Exception e) {
+                    Log.e(K9.LOG_TAG, "Exception while writing message to crypto provider", e);
+                } finally {
+                    try {
+                        out.close();
+                    } catch (IOException e) {
+                        // don't care
+                    }
                 }
             }
-        };
+        }).start();
+
+        return pipedInputStream;
     }
 
-    private OpenPgpDataSink<MimeBodyPart> getDataSinkForDecryptedData() throws IOException {
-        return new OpenPgpDataSink<MimeBodyPart>() {
+    private PipedOutputStream getPipedOutputStreamForDecryptedData(final CountDownLatch latch) throws IOException {
+        PipedOutputStream decryptedOutputStream = new PipedOutputStream();
+        final PipedInputStream decryptedInputStream = new PipedInputStream(decryptedOutputStream);
+        new AsyncTask<Void, Void, MimeBodyPart>() {
             @Override
-            @WorkerThread
-            public MimeBodyPart processData(InputStream is) throws IOException {
+            protected MimeBodyPart doInBackground(Void... params) {
+                MimeBodyPart decryptedPart = null;
                 try {
-                    FileFactory fileFactory =
-                            DecryptedFileProvider.getFileFactory(context);
-                    return MimePartStreamParser.parse(fileFactory, is);
-                } catch (MessagingException e) {
+                    decryptedPart = DecryptStreamParser.parse(context, decryptedInputStream);
+
+                    latch.await();
+                } catch (InterruptedException e) {
+                    Log.w(K9.LOG_TAG, "we were interrupted while waiting for onReturn!", e);
+                } catch (Exception e) {
                     Log.e(K9.LOG_TAG, "Something went wrong while parsing the decrypted MIME part", e);
                     //TODO: pass error to main thread and display error message to user
-                    return null;
                 }
+                return decryptedPart;
             }
-        };
+
+            @Override
+            protected void onPostExecute(MimeBodyPart decryptedPart) {
+                onCryptoOperationReturned(decryptedPart);
+            }
+        }.execute();
+        return decryptedOutputStream;
     }
 
-    private void onCryptoOperationReturned(MimeBodyPart decryptedPart) {
+    private void onCryptoOperationReturned(MimeBodyPart outputPart) {
         if (currentCryptoResult == null) {
             Log.e(K9.LOG_TAG, "Internal error: we should have a result here!");
             return;
         }
 
         try {
-            handleCryptoOperationResult(decryptedPart);
+            handleCryptoOperationResult(outputPart);
         } finally {
             currentCryptoResult = null;
         }
@@ -496,7 +382,11 @@ public class MessageCryptoHelper {
             throw new AssertionError("Expecting PendingIntent on USER_INTERACTION_REQUIRED!");
         }
 
-        callbackPendingIntent(pendingIntent);
+        try {
+            activity.startIntentSenderForResult(pendingIntent.getIntentSender(), REQUEST_CODE_CRYPTO, null, 0, 0, 0);
+        } catch (SendIntentException e) {
+            Log.e(K9.LOG_TAG, "Internal error on starting pendingintent!", e);
+        }
     }
 
     private void handleCryptoOperationError() {
@@ -505,160 +395,72 @@ public class MessageCryptoHelper {
             Log.w(K9.LOG_TAG, "OpenPGP API error: " + error.getMessage());
         }
 
-        onCryptoOperationFailed(error);
+        onCryptoFailed(error);
     }
 
     private void handleCryptoOperationSuccess(MimeBodyPart outputPart) {
-        OpenPgpDecryptionResult decryptionResult =
-                currentCryptoResult.getParcelableExtra(OpenPgpApi.RESULT_DECRYPTION);
-        OpenPgpSignatureResult signatureResult =
-                currentCryptoResult.getParcelableExtra(OpenPgpApi.RESULT_SIGNATURE);
+        OpenPgpResultAnnotation resultAnnotation = new OpenPgpResultAnnotation();
+
+        resultAnnotation.setOutputData(outputPart);
+
+        int resultType = currentCryptoResult.getIntExtra(OpenPgpApi.RESULT_TYPE,
+                OpenPgpApi.RESULT_TYPE_UNENCRYPTED_UNSIGNED);
+        if ((resultType & OpenPgpApi.RESULT_TYPE_ENCRYPTED) == OpenPgpApi.RESULT_TYPE_ENCRYPTED) {
+            resultAnnotation.setWasEncrypted(true);
+        } else {
+            resultAnnotation.setWasEncrypted(false);
+        }
+        if ((resultType & OpenPgpApi.RESULT_TYPE_SIGNED) == OpenPgpApi.RESULT_TYPE_SIGNED) {
+            OpenPgpSignatureResult signatureResult =
+                    currentCryptoResult.getParcelableExtra(OpenPgpApi.RESULT_SIGNATURE);
+            resultAnnotation.setSignatureResult(signatureResult);
+        }
+
         PendingIntent pendingIntent = currentCryptoResult.getParcelableExtra(OpenPgpApi.RESULT_INTENT);
+        resultAnnotation.setPendingIntent(pendingIntent);
 
-        CryptoResultAnnotation resultAnnotation = CryptoResultAnnotation.createOpenPgpResultAnnotation(
-                decryptionResult, signatureResult, pendingIntent, outputPart);
-
-        onCryptoOperationSuccess(resultAnnotation);
+        onCryptoSuccess(resultAnnotation);
     }
 
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (isCancelled) {
+    public void handleCryptoResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode != REQUEST_CODE_CRYPTO) {
             return;
         }
 
-        if (requestCode != REQUEST_CODE_USER_INTERACTION) {
-            throw new IllegalStateException("got an activity result that wasn't meant for us. this is a bug!");
-        }
         if (resultCode == Activity.RESULT_OK) {
-            userInteractionResultIntent = data;
             decryptOrVerifyNextPart();
         } else {
-            onCryptoOperationCanceled();
+            // FIXME: don't pass null
+            onCryptoFailed(null);
         }
     }
 
-    private void onCryptoOperationSuccess(CryptoResultAnnotation resultAnnotation) {
-        addCryptoResultAnnotationToMessage(resultAnnotation);
+    private void onCryptoSuccess(OpenPgpResultAnnotation resultAnnotation) {
+        addOpenPgpResultPartToMessage(resultAnnotation);
         onCryptoFinished();
     }
 
-    private void propagateEncapsulatedSignedPart(CryptoResultAnnotation resultAnnotation, Part part) {
-        Part encapsulatingPart = messageAnnotations.findKeyForAnnotationWithReplacementPart(part);
-        CryptoResultAnnotation encapsulatingPartAnnotation = messageAnnotations.get(encapsulatingPart);
-
-        if (encapsulatingPart != null && resultAnnotation.hasSignatureResult()) {
-            CryptoResultAnnotation replacementAnnotation =
-                    encapsulatingPartAnnotation.withEncapsulatedResult(resultAnnotation);
-            messageAnnotations.put(encapsulatingPart, replacementAnnotation);
-        }
-    }
-
-    private void onCryptoOperationCanceled() {
-        CryptoResultAnnotation errorPart = CryptoResultAnnotation.createOpenPgpCanceledAnnotation();
-        addCryptoResultAnnotationToMessage(errorPart);
-        onCryptoFinished();
-    }
-
-    private void onCryptoOperationFailed(OpenPgpError error) {
-        CryptoResultAnnotation errorPart = CryptoResultAnnotation.createOpenPgpErrorAnnotation(error);
-        addCryptoResultAnnotationToMessage(errorPart);
-        onCryptoFinished();
-    }
-
-    private void addCryptoResultAnnotationToMessage(CryptoResultAnnotation resultAnnotation) {
+    private void addOpenPgpResultPartToMessage(OpenPgpResultAnnotation resultAnnotation) {
         Part part = currentCryptoPart.part;
         messageAnnotations.put(part, resultAnnotation);
+    }
 
-        propagateEncapsulatedSignedPart(resultAnnotation, part);
+    private void onCryptoFailed(OpenPgpError error) {
+        OpenPgpResultAnnotation errorPart = new OpenPgpResultAnnotation();
+        errorPart.setError(error);
+        addOpenPgpResultPartToMessage(errorPart);
+        onCryptoFinished();
     }
 
     private void onCryptoFinished() {
-        currentCryptoPart = null;
         partsToDecryptOrVerify.removeFirst();
         decryptOrVerifyNextPart();
     }
 
-    private void runSecondPassOrReturnResultToFragment() {
-        if (secondPassStarted) {
-            callbackReturnResult();
-            return;
-        }
-        secondPassStarted = true;
-        runSecondPass();
+    private void returnResultToFragment() {
+        callback.onCryptoOperationsFinished(messageAnnotations);
     }
 
-    private void cleanupAfterProcessingFinished() {
-        partsToDecryptOrVerify = null;
-        openPgpApi = null;
-        if (openPgpServiceConnection != null) {
-            openPgpServiceConnection.unbindFromService();
-        }
-        openPgpServiceConnection = null;
-    }
-
-    public void detachCallback() {
-        synchronized (callbackLock) {
-            callback = null;
-        }
-    }
-
-    private void reattachCallback(LocalMessage message, MessageCryptoCallback callback) {
-        if (!message.equals(currentMessage)) {
-            throw new AssertionError("Callback may only be reattached for the same message!");
-        }
-        synchronized (callbackLock) {
-            if (queuedResult != null) {
-                Log.d(K9.LOG_TAG, "Returning cached result to reattached callback");
-            }
-            this.callback = callback;
-            deliverResult();
-        }
-    }
-
-    private void callbackPendingIntent(PendingIntent pendingIntent) {
-        synchronized (callbackLock) {
-            queuedPendingIntent = pendingIntent;
-            deliverResult();
-        }
-    }
-
-    private void callbackReturnResult() {
-        synchronized (callbackLock) {
-            cleanupAfterProcessingFinished();
-
-            queuedResult = messageAnnotations;
-            messageAnnotations = null;
-
-            deliverResult();
-        }
-    }
-
-    private void callbackProgress(int current, int max) {
-        synchronized (callbackLock) {
-            if (callback != null) {
-                callback.onCryptoHelperProgress(current, max);
-            }
-        }
-    }
-
-    // This method must only be called inside a synchronized(callbackLock) block!
-    private void deliverResult() {
-        if (isCancelled) {
-            return;
-        }
-
-        if (callback == null) {
-            Log.d(K9.LOG_TAG, "Keeping crypto helper result in queue for later delivery");
-            return;
-        }
-        if (queuedResult != null) {
-            callback.onCryptoOperationsFinished(queuedResult);
-        } else if (queuedPendingIntent != null) {
-            callback.startPendingIntentForCryptoHelper(
-                    queuedPendingIntent.getIntentSender(), REQUEST_CODE_USER_INTERACTION, null, 0, 0, 0);
-            queuedPendingIntent = null;
-        }
-    }
 
     private static class CryptoPart {
         public final CryptoPartType type;
@@ -671,37 +473,8 @@ public class MessageCryptoHelper {
     }
 
     private enum CryptoPartType {
-        PGP_INLINE,
-        PGP_ENCRYPTED,
-        PGP_SIGNED
+        INLINE_PGP,
+        ENCRYPTED,
+        SIGNED
     }
-
-    @Nullable
-    private static MimeBodyPart getMultipartSignedContentPartIfAvailable(Part part) {
-        MimeBodyPart replacementPart = NO_REPLACEMENT_PART;
-        Body body = part.getBody();
-        if (body instanceof MimeMultipart) {
-            MimeMultipart multipart = ((MimeMultipart) part.getBody());
-            if (multipart.getCount() >= 1) {
-                replacementPart = (MimeBodyPart) multipart.getBodyPart(0);
-            }
-        }
-        return replacementPart;
-    }
-
-    private static MimeBodyPart extractClearsignedTextReplacementPart(Part part) {
-        try {
-            String clearsignedText = MessageExtractor.getTextFromPart(part);
-            String replacementText = OpenPgpUtils.extractClearsignedMessage(clearsignedText);
-            if (replacementText == null) {
-                Log.e(K9.LOG_TAG, "failed to extract clearsigned text for replacement part");
-                return NO_REPLACEMENT_PART;
-            }
-            return new MimeBodyPart(new TextBody(replacementText), "text/plain");
-        } catch (MessagingException e) {
-            Log.e(K9.LOG_TAG, "failed to create clearsigned text replacement part", e);
-            return NO_REPLACEMENT_PART;
-        }
-    }
-
 }

@@ -1,8 +1,9 @@
 package com.fsck.k9.mailstore;
 
-
-import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Date;
+import java.util.Set;
 
 import android.content.ContentValues;
 import android.database.Cursor;
@@ -10,19 +11,18 @@ import android.database.sqlite.SQLiteDatabase;
 import android.util.Log;
 
 import com.fsck.k9.Account;
-import com.fsck.k9.BuildConfig;
 import com.fsck.k9.K9;
 import com.fsck.k9.activity.MessageReference;
 import com.fsck.k9.mail.Address;
 import com.fsck.k9.mail.Flag;
 import com.fsck.k9.mail.Folder;
 import com.fsck.k9.mail.MessagingException;
+import com.fsck.k9.mail.Part;
+import com.fsck.k9.mail.internet.MessageExtractor;
 import com.fsck.k9.mail.internet.MimeMessage;
-import com.fsck.k9.mail.message.MessageHeaderParser;
+import com.fsck.k9.mail.internet.MimeUtility;
 import com.fsck.k9.mailstore.LockableDatabase.DbCallback;
 import com.fsck.k9.mailstore.LockableDatabase.WrappedException;
-import com.fsck.k9.message.extractors.PreviewResult.PreviewType;
-
 
 public class LocalMessage extends MimeMessage {
     protected MessageReference mReference;
@@ -34,11 +34,12 @@ public class LocalMessage extends MimeMessage {
 
     private String mPreview = "";
 
+    private boolean mHeadersLoaded = false;
+
     private long mThreadId;
     private long mRootId;
     private long messagePartId;
     private String mimeType;
-    private PreviewType previewType;
 
     private LocalMessage(LocalStore localStore) {
         this.localStore = localStore;
@@ -86,14 +87,8 @@ public class LocalMessage extends MimeMessage {
         this.setInternalDate(new Date(cursor.getLong(11)));
         this.setMessageId(cursor.getString(12));
 
-        String previewTypeString = cursor.getString(24);
-        DatabasePreviewType databasePreviewType = DatabasePreviewType.fromDatabaseValue(previewTypeString);
-        previewType = databasePreviewType.getPreviewType();
-        if (previewType == PreviewType.TEXT) {
-            mPreview = cursor.getString(14);
-        } else {
-            mPreview = "";
-        }
+        final String preview = cursor.getString(14);
+        mPreview = (preview == null ? "" : preview);
 
         if (this.mFolder == null) {
             LocalFolder f = new LocalFolder(this.localStore, cursor.getInt(13));
@@ -118,16 +113,9 @@ public class LocalMessage extends MimeMessage {
 
         messagePartId = cursor.getLong(22);
         mimeType = cursor.getString(23);
-
-        byte[] header = cursor.getBlob(25);
-        if (header != null) {
-            MessageHeaderParser.parse(this, new ByteArrayInputStream(header));
-        } else {
-            Log.d(K9.LOG_TAG, "No headers available for this message!");
-        }
     }
 
-    public long getMessagePartId() {
+    long getMessagePartId() {
         return messagePartId;
     }
 
@@ -140,10 +128,16 @@ public class LocalMessage extends MimeMessage {
      * changes.
      */
 
-    public PreviewType getPreviewType() {
-        return previewType;
+    @Override
+    public void writeTo(OutputStream out) throws IOException, MessagingException {
+        if (!mHeadersLoaded) {
+            loadHeaders();
+        }
+
+        super.writeTo(out);
     }
 
+    @Override
     public String getPreview() {
         return mPreview;
     }
@@ -155,7 +149,7 @@ public class LocalMessage extends MimeMessage {
 
 
     @Override
-    public void setSubject(String subject) {
+    public void setSubject(String subject) throws MessagingException {
         mSubject = subject;
     }
 
@@ -181,13 +175,13 @@ public class LocalMessage extends MimeMessage {
     }
 
     @Override
-    public void setFrom(Address from) {
+    public void setFrom(Address from) throws MessagingException {
         this.mFrom = new Address[] { from };
     }
 
 
     @Override
-    public void setReplyTo(Address[] replyTo) {
+    public void setReplyTo(Address[] replyTo) throws MessagingException {
         if (replyTo == null || replyTo.length == 0) {
             mReplyTo = null;
         } else {
@@ -201,7 +195,7 @@ public class LocalMessage extends MimeMessage {
      * which removes (expensive) them before adding them
      */
     @Override
-    public void setRecipients(RecipientType type, Address[] addresses) {
+    public void setRecipients(RecipientType type, Address[] addresses) throws MessagingException {
         if (type == RecipientType.TO) {
             if (addresses == null || addresses.length == 0) {
                 this.mTo = null;
@@ -221,7 +215,7 @@ public class LocalMessage extends MimeMessage {
                 this.mBcc = addresses;
             }
         } else {
-            throw new IllegalArgumentException("Unrecognized recipient type.");
+            throw new MessagingException("Unrecognized recipient type.");
         }
     }
 
@@ -312,39 +306,6 @@ public class LocalMessage extends MimeMessage {
         localStore.notifyChange();
     }
 
-    public void debugClearLocalData() throws MessagingException {
-        if (!BuildConfig.DEBUG) {
-            throw new AssertionError("method must only be used in debug build!");
-        }
-
-        try {
-            localStore.database.execute(true, new DbCallback<Void>() {
-                @Override
-                public Void doDbWork(final SQLiteDatabase db) throws WrappedException, MessagingException {
-                    ContentValues cv = new ContentValues();
-                    cv.putNull("message_part_id");
-
-                    db.update("messages", cv, "id = ?", new String[] { Long.toString(mId) });
-
-                    try {
-                        ((LocalFolder) mFolder).deleteMessagePartsAndDataFromDisk(messagePartId);
-                    } catch (MessagingException e) {
-                        throw new WrappedException(e);
-                    }
-
-                    setFlag(Flag.X_DOWNLOADED_FULL, false);
-                    setFlag(Flag.X_DOWNLOADED_PARTIAL, false);
-
-                    return null;
-                }
-            });
-        } catch (WrappedException e) {
-            throw (MessagingException) e.getCause();
-        }
-
-        localStore.notifyChange();
-    }
-
     /*
      * Completely remove a message from the local database
      *
@@ -361,8 +322,6 @@ public class LocalMessage extends MimeMessage {
                         LocalFolder localFolder = (LocalFolder) mFolder;
 
                         localFolder.deleteMessagePartsAndDataFromDisk(messagePartId);
-
-                        deleteFulltextIndexEntry(db, mId);
 
                         if (hasThreadChildren(db, mId)) {
                             // This message has children in the thread structure so we need to
@@ -470,11 +429,6 @@ public class LocalMessage extends MimeMessage {
         }
     }
 
-    private void deleteFulltextIndexEntry(SQLiteDatabase db, long messageId) {
-        String[] idArg = { Long.toString(messageId) };
-        db.delete("messages_fulltext", "docid = ?", idArg);
-    }
-
     /**
      * Delete a message from the 'messages' and 'threads' tables.
      *
@@ -494,6 +448,39 @@ public class LocalMessage extends MimeMessage {
         db.delete("threads", "message_id = ?", idArg);
     }
 
+    private void loadHeaders() throws MessagingException {
+        mHeadersLoaded = true;
+        getFolder().populateHeaders(this);
+    }
+
+    @Override
+    public void setHeader(String name, String value) throws MessagingException {
+        if (!mHeadersLoaded)
+            loadHeaders();
+        super.setHeader(name, value);
+    }
+
+    @Override
+    public String[] getHeader(String name) throws MessagingException {
+        if (!mHeadersLoaded)
+            loadHeaders();
+        return super.getHeader(name);
+    }
+
+    @Override
+    public void removeHeader(String name) throws MessagingException {
+        if (!mHeadersLoaded)
+            loadHeaders();
+        super.removeHeader(name);
+    }
+
+    @Override
+    public Set<String> getHeaderNames() throws MessagingException {
+        if (!mHeadersLoaded)
+            loadHeaders();
+        return super.getHeaderNames();
+    }
+
     @Override
     public LocalMessage clone() {
         LocalMessage message = new LocalMessage(this.localStore);
@@ -503,6 +490,7 @@ public class LocalMessage extends MimeMessage {
         message.mAttachmentCount = mAttachmentCount;
         message.mSubject = mSubject;
         message.mPreview = mPreview;
+        message.mHeadersLoaded = mHeadersLoaded;
 
         return message;
     }
@@ -545,20 +533,12 @@ public class LocalMessage extends MimeMessage {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        if (!super.equals(o)) {
-            return false;
-        }
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o)) return false;
 
-        // distinguish by account uuid, in addition to what Message.equals() does above
-        String thisAccountUuid = getAccountUuid();
-        String thatAccountUuid = ((LocalMessage) o).getAccountUuid();
-        return thisAccountUuid != null ? thisAccountUuid.equals(thatAccountUuid) : thatAccountUuid == null;
+        final LocalMessage that = (LocalMessage) o;
+        return !(getAccountUuid() != null ? !getAccountUuid().equals(that.getAccountUuid()) : that.getAccountUuid() != null);
     }
 
     @Override

@@ -48,7 +48,7 @@ class JisSupport {
     }
 
 
-    private static String getJisVariantFromMailerHeaders(Message message) {
+    private static String getJisVariantFromMailerHeaders(Message message) throws MessagingException {
         String[] mailerHeaders = message.getHeader("X-Mailer");
         if (mailerHeaders.length == 0)
             return null;

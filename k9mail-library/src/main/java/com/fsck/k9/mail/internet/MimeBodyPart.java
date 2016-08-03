@@ -10,8 +10,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-
-import android.support.annotation.NonNull;
+import java.util.Locale;
 
 import org.apache.james.mime4j.util.MimeUtil;
 
@@ -20,7 +19,7 @@ import org.apache.james.mime4j.util.MimeUtil;
  * Message.
  */
 public class MimeBodyPart extends BodyPart {
-    private final MimeHeader mHeader;
+    private final MimeHeader mHeader = new MimeHeader();
     private Body mBody;
 
     public MimeBodyPart() throws MessagingException {
@@ -32,15 +31,9 @@ public class MimeBodyPart extends BodyPart {
     }
 
     public MimeBodyPart(Body body, String mimeType) throws MessagingException {
-        mHeader = new MimeHeader();
         if (mimeType != null) {
             addHeader(MimeHeader.HEADER_CONTENT_TYPE, mimeType);
         }
-        MimeMessageHelper.setBody(this, body);
-    }
-
-    MimeBodyPart(MimeHeader header, Body body)  throws MessagingException {
-        mHeader = header;
         MimeMessageHelper.setBody(this, body);
     }
 
@@ -49,7 +42,7 @@ public class MimeBodyPart extends BodyPart {
     }
 
     @Override
-    public void addHeader(String name, String value) {
+    public void addHeader(String name, String value) throws MessagingException {
         mHeader.addHeader(name, value);
     }
 
@@ -63,14 +56,13 @@ public class MimeBodyPart extends BodyPart {
         mHeader.setHeader(name, value);
     }
 
-    @NonNull
     @Override
-    public String[] getHeader(String name) {
+    public String[] getHeader(String name) throws MessagingException {
         return mHeader.getHeader(name);
     }
 
     @Override
-    public void removeHeader(String name) {
+    public void removeHeader(String name) throws MessagingException {
         mHeader.removeHeader(name);
     }
 
@@ -95,11 +87,11 @@ public class MimeBodyPart extends BodyPart {
     @Override
     public String getContentType() {
         String contentType = getFirstHeader(MimeHeader.HEADER_CONTENT_TYPE);
-        return (contentType == null) ? "text/plain" : MimeUtility.unfoldAndDecode(contentType);
+        return (contentType == null) ? "text/plain" : contentType;
     }
 
     @Override
-    public String getDisposition() {
+    public String getDisposition() throws MessagingException {
         return getFirstHeader(MimeHeader.HEADER_CONTENT_DISPOSITION);
     }
 
@@ -124,7 +116,7 @@ public class MimeBodyPart extends BodyPart {
     }
 
     @Override
-    public boolean isMimeType(String mimeType) {
+    public boolean isMimeType(String mimeType) throws MessagingException {
         return getMimeType().equalsIgnoreCase(mimeType);
     }
 
@@ -155,15 +147,17 @@ public class MimeBodyPart extends BodyPart {
          * header if any of its subparts are 8bit, so we automatically recurse
          * (as long as its not multipart/signed).
          */
-        if (mBody instanceof CompositeBody && !MimeUtility.isSameMimeType(type, "multipart/signed")) {
+        if (mBody instanceof CompositeBody
+                && !"multipart/signed".equalsIgnoreCase(type)) {
             setEncoding(MimeUtil.ENC_7BIT);
             // recurse
             ((CompositeBody) mBody).setUsing7bitTransport();
         } else if (!MimeUtil.ENC_8BIT
                 .equalsIgnoreCase(getFirstHeader(MimeHeader.HEADER_CONTENT_TRANSFER_ENCODING))) {
             return;
-        } else if (type != null &&
-                (MimeUtility.isSameMimeType(type, "multipart/signed") || MimeUtility.isMessage(type))) {
+        } else if (type != null
+                && (type.equalsIgnoreCase("multipart/signed") || type
+                        .toLowerCase(Locale.US).startsWith("message/"))) {
             /*
              * This shouldn't happen. In any case, it would be wrong to convert
              * them to some other encoding for 7bit transport.
@@ -186,5 +180,4 @@ public class MimeBodyPart extends BodyPart {
             setEncoding(MimeUtil.ENC_QUOTED_PRINTABLE);
         }
     }
-
 }

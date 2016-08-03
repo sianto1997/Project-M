@@ -14,7 +14,6 @@ public interface StoreConfig {
     String getOutboxFolderName();
     String getDraftsFolderName();
 
-    void setArchiveFolderName(String name);
     void setDraftsFolderName(String name);
     void setTrashFolderName(String name);
     void setSpamFolderName(String name);

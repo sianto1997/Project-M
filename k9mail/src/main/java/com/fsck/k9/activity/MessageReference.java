@@ -109,18 +109,16 @@ public class MessageReference implements Parcelable {
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof MessageReference)) {
+        if (o instanceof MessageReference == false) {
             return false;
         }
         MessageReference other = (MessageReference) o;
-        return equals(other.accountUuid, other.folderName, other.uid);
-    }
-
-    public boolean equals(String accountUuid, String folderName, String uid) {
-        // noinspection StringEquality, we check for null values here
-        return ((accountUuid == this.accountUuid || (accountUuid != null && accountUuid.equals(this.accountUuid)))
-                && (folderName == this.folderName || (folderName != null && folderName.equals(this.folderName)))
-                && (uid == this.uid || (uid != null && uid.equals(this.uid))));
+        if ((accountUuid == other.accountUuid || (accountUuid != null && accountUuid.equals(other.accountUuid)))
+                && (folderName == other.folderName || (folderName != null && folderName.equals(other.folderName)))
+                && (uid == other.uid || (uid != null && uid.equals(other.uid)))) {
+            return true;
+        }
+        return false;
     }
 
     @Override

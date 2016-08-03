@@ -28,8 +28,8 @@ import com.fsck.k9.mail.ServerSettings.Type;
 import com.fsck.k9.mail.Store;
 import com.fsck.k9.mail.Transport;
 import com.fsck.k9.mail.store.RemoteStore;
-import com.fsck.k9.mail.store.imap.ImapStoreSettings;
-import com.fsck.k9.mail.store.webdav.WebDavStoreSettings;
+import com.fsck.k9.mail.store.imap.ImapStore.ImapStoreSettings;
+import com.fsck.k9.mail.store.webdav.WebDavStore.WebDavStoreSettings;
 import com.fsck.k9.account.AccountCreator;
 import com.fsck.k9.service.MailService;
 import com.fsck.k9.view.ClientCertificateSpinner;
@@ -276,7 +276,7 @@ public class AccountSetupIncoming extends K9Activity implements OnClickListener 
             }
 
             if (settings.port != -1) {
-                mPortView.setText(String.format("%d", settings.port));
+                mPortView.setText(Integer.toString(settings.port));
             } else {
                 updatePortFromSecurityType();
             }

@@ -1,7 +1,6 @@
 
 package com.fsck.k9.mail.internet;
 
-
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -10,22 +9,12 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.TimeZone;
 import java.util.LinkedList;
 import java.util.Locale;
 import java.util.Set;
-import java.util.TimeZone;
 import java.util.UUID;
 
-import android.support.annotation.NonNull;
-
-import com.fsck.k9.mail.Address;
-import com.fsck.k9.mail.Body;
-import com.fsck.k9.mail.BodyPart;
-import com.fsck.k9.mail.CompositeBody;
-import com.fsck.k9.mail.Message;
-import com.fsck.k9.mail.MessagingException;
-import com.fsck.k9.mail.Multipart;
-import com.fsck.k9.mail.Part;
 import org.apache.commons.io.IOUtils;
 import org.apache.james.mime4j.MimeException;
 import org.apache.james.mime4j.dom.field.DateTimeField;
@@ -37,6 +26,15 @@ import org.apache.james.mime4j.stream.BodyDescriptor;
 import org.apache.james.mime4j.stream.Field;
 import org.apache.james.mime4j.stream.MimeConfig;
 import org.apache.james.mime4j.util.MimeUtil;
+
+import com.fsck.k9.mail.Address;
+import com.fsck.k9.mail.Body;
+import com.fsck.k9.mail.BodyPart;
+import com.fsck.k9.mail.CompositeBody;
+import com.fsck.k9.mail.Message;
+import com.fsck.k9.mail.MessagingException;
+import com.fsck.k9.mail.Multipart;
+import com.fsck.k9.mail.Part;
 
 /**
  * An implementation of Message that stores all of it's metadata in RFC 822 and
@@ -114,7 +112,8 @@ public class MimeMessage extends Message {
         try {
             parser.parse(new EOLConvertingInputStream(in));
         } catch (MimeException me) {
-            throw new MessagingException(me.getMessage(), me);
+            //TODO wouldn't a MessagingException be better?
+            throw new Error(me);
         }
     }
 
@@ -140,7 +139,7 @@ public class MimeMessage extends Message {
      * @param sentDate
      * @throws com.fsck.k9.mail.MessagingException
      */
-    public void addSentDate(Date sentDate, boolean hideTimeZone) {
+    public void addSentDate(Date sentDate, boolean hideTimeZone) throws MessagingException {
         if (mDateFormat == null) {
             mDateFormat = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.US);
         }
@@ -154,7 +153,7 @@ public class MimeMessage extends Message {
     }
 
     @Override
-    public void setSentDate(Date sentDate, boolean hideTimeZone) {
+    public void setSentDate(Date sentDate, boolean hideTimeZone) throws MessagingException {
         removeHeader("Date");
         addSentDate(sentDate, hideTimeZone);
     }
@@ -166,12 +165,12 @@ public class MimeMessage extends Message {
     @Override
     public String getContentType() {
         String contentType = getFirstHeader(MimeHeader.HEADER_CONTENT_TYPE);
-        return (contentType == null) ? "text/plain" : MimeUtility.unfoldAndDecode(contentType);
+        return (contentType == null) ? "text/plain" : contentType;
     }
 
     @Override
-    public String getDisposition() {
-        return MimeUtility.unfoldAndDecode(getFirstHeader(MimeHeader.HEADER_CONTENT_DISPOSITION));
+    public String getDisposition() throws MessagingException {
+        return getFirstHeader(MimeHeader.HEADER_CONTENT_DISPOSITION);
     }
 
     @Override
@@ -185,7 +184,7 @@ public class MimeMessage extends Message {
     }
 
     @Override
-    public boolean isMimeType(String mimeType) {
+    public boolean isMimeType(String mimeType) throws MessagingException {
         return getMimeType().equalsIgnoreCase(mimeType);
     }
 
@@ -199,33 +198,29 @@ public class MimeMessage extends Message {
      * found the method returns an empty array.
      */
     @Override
-    public Address[] getRecipients(RecipientType type) {
-        switch (type) {
-            case TO: {
-                if (mTo == null) {
-                    mTo = Address.parse(MimeUtility.unfold(getFirstHeader("To")));
-                }
-                return mTo;
+    public Address[] getRecipients(RecipientType type) throws MessagingException {
+        if (type == RecipientType.TO) {
+            if (mTo == null) {
+                mTo = Address.parse(MimeUtility.unfold(getFirstHeader("To")));
             }
-            case CC: {
-                if (mCc == null) {
-                    mCc = Address.parse(MimeUtility.unfold(getFirstHeader("CC")));
-                }
-                return mCc;
+            return mTo;
+        } else if (type == RecipientType.CC) {
+            if (mCc == null) {
+                mCc = Address.parse(MimeUtility.unfold(getFirstHeader("CC")));
             }
-            case BCC: {
-                if (mBcc == null) {
-                    mBcc = Address.parse(MimeUtility.unfold(getFirstHeader("BCC")));
-                }
-                return mBcc;
+            return mCc;
+        } else if (type == RecipientType.BCC) {
+            if (mBcc == null) {
+                mBcc = Address.parse(MimeUtility.unfold(getFirstHeader("BCC")));
             }
+            return mBcc;
+        } else {
+            throw new MessagingException("Unrecognized recipient type.");
         }
-
-        throw new IllegalArgumentException("Unrecognized recipient type.");
     }
 
     @Override
-    public void setRecipients(RecipientType type, Address[] addresses) {
+    public void setRecipients(RecipientType type, Address[] addresses) throws MessagingException {
         if (type == RecipientType.TO) {
             if (addresses == null || addresses.length == 0) {
                 removeHeader("To");
@@ -251,7 +246,7 @@ public class MimeMessage extends Message {
                 this.mBcc = addresses;
             }
         } else {
-            throw new IllegalStateException("Unrecognized recipient type.");
+            throw new MessagingException("Unrecognized recipient type.");
         }
     }
 
@@ -264,7 +259,7 @@ public class MimeMessage extends Message {
     }
 
     @Override
-    public void setSubject(String subject) {
+    public void setSubject(String subject) throws MessagingException {
         setHeader("Subject", subject);
     }
 
@@ -281,7 +276,7 @@ public class MimeMessage extends Message {
     }
 
     @Override
-    public void setFrom(Address from) {
+    public void setFrom(Address from) throws MessagingException {
         if (from != null) {
             setHeader("From", from.toEncodedString());
             this.mFrom = new Address[] {
@@ -301,7 +296,7 @@ public class MimeMessage extends Message {
     }
 
     @Override
-    public void setReplyTo(Address[] replyTo) {
+    public void setReplyTo(Address[] replyTo) throws MessagingException {
         if (replyTo == null || replyTo.length == 0) {
             removeHeader("Reply-to");
             mReplyTo = null;
@@ -312,7 +307,7 @@ public class MimeMessage extends Message {
     }
 
     @Override
-    public String getMessageId() {
+    public String getMessageId() throws MessagingException {
         if (mMessageId == null) {
             mMessageId = getFirstHeader("Message-ID");
         }
@@ -340,18 +335,18 @@ public class MimeMessage extends Message {
         setMessageId(messageId);
     }
 
-    public void setMessageId(String messageId) {
+    public void setMessageId(String messageId) throws MessagingException {
         setHeader("Message-ID", messageId);
         mMessageId = messageId;
     }
 
     @Override
-    public void setInReplyTo(String inReplyTo) {
+    public void setInReplyTo(String inReplyTo) throws MessagingException {
         setHeader("In-Reply-To", inReplyTo);
     }
 
     @Override
-    public String[] getReferences() {
+    public String[] getReferences() throws MessagingException {
         if (mReferences == null) {
             mReferences = getHeader("References");
         }
@@ -359,7 +354,7 @@ public class MimeMessage extends Message {
     }
 
     @Override
-    public void setReferences(String references) {
+    public void setReferences(String references) throws MessagingException {
         /*
          * Make sure the References header doesn't exceed the maximum header
          * line length and won't get (Q-)encoded later. Otherwise some clients
@@ -410,7 +405,7 @@ public class MimeMessage extends Message {
     }
 
     @Override
-    public void addHeader(String name, String value) {
+    public void addHeader(String name, String value) throws MessagingException {
         mHeader.addHeader(name, value);
     }
 
@@ -420,23 +415,22 @@ public class MimeMessage extends Message {
     }
 
     @Override
-    public void setHeader(String name, String value) {
+    public void setHeader(String name, String value) throws MessagingException {
         mHeader.setHeader(name, value);
     }
 
-    @NonNull
     @Override
-    public String[] getHeader(String name) {
+    public String[] getHeader(String name) throws MessagingException {
         return mHeader.getHeader(name);
     }
 
     @Override
-    public void removeHeader(String name) {
+    public void removeHeader(String name) throws MessagingException {
         mHeader.removeHeader(name);
     }
 
     @Override
-    public Set<String> getHeaderNames() {
+    public Set<String> getHeaderNames() throws MessagingException {
         return mHeader.getHeaderNames();
     }
 
@@ -482,7 +476,7 @@ public class MimeMessage extends Message {
     }
 
     private class MimeMessageBuilder implements ContentHandler {
-        private final LinkedList<Object> stack = new LinkedList<>();
+        private final LinkedList<Object> stack = new LinkedList<Object>();
 
         public MimeMessageBuilder() {
         }
@@ -525,26 +519,31 @@ public class MimeMessage extends Message {
         }
 
         @Override
-        public void startMultipart(BodyDescriptor bd) throws MimeException {
+        public void startMultipart(BodyDescriptor bd) {
             expect(Part.class);
 
             Part e = (Part)stack.peek();
             try {
-                String mimeType = bd.getMimeType();
-                String boundary = bd.getBoundary();
+                String contentType = e.getContentType();
+                String mimeType = MimeUtility.getHeaderParameter(contentType, null);
+                String boundary = MimeUtility.getHeaderParameter(contentType, "boundary");
                 MimeMultipart multiPart = new MimeMultipart(mimeType, boundary);
                 e.setBody(multiPart);
                 stack.addFirst(multiPart);
             } catch (MessagingException me) {
-                throw new MimeException(me.getMessage(), me);
+                throw new Error(me);
             }
         }
 
         @Override
-        public void body(BodyDescriptor bd, InputStream in) throws IOException, MimeException {
+        public void body(BodyDescriptor bd, InputStream in) throws IOException {
             expect(Part.class);
-            Body body = MimeUtility.createBody(in, bd.getTransferEncoding(), bd.getMimeType());
-            ((Part)stack.peek()).setBody(body);
+            try {
+                Body body = MimeUtility.createBody(in, bd.getTransferEncoding(), bd.getMimeType());
+                ((Part)stack.peek()).setBody(body);
+            } catch (MessagingException me) {
+                throw new Error(me);
+            }
         }
 
         @Override
@@ -567,7 +566,7 @@ public class MimeMessage extends Message {
         }
 
         @Override
-        public void startBodyPart() throws MimeException {
+        public void startBodyPart() {
             expect(MimeMultipart.class);
 
             try {
@@ -575,7 +574,7 @@ public class MimeMessage extends Message {
                 ((MimeMultipart)stack.peek()).addBodyPart(bodyPart);
                 stack.addFirst(bodyPart);
             } catch (MessagingException me) {
-                throw new MimeException(me);
+                throw new Error(me);
             }
         }
 
@@ -609,9 +608,13 @@ public class MimeMessage extends Message {
         @Override
         public void field(Field parsedField) throws MimeException {
             expect(Part.class);
-            String name = parsedField.getName();
-            String raw = parsedField.getRaw().toString();
-            ((Part) stack.peek()).addRawHeader(name, raw);
+            try {
+                String name = parsedField.getName();
+                String raw = parsedField.getRaw().toString();
+                ((Part) stack.peek()).addRawHeader(name, raw);
+            } catch (MessagingException me) {
+                throw new Error(me);
+            }
         }
     }
 
@@ -654,6 +657,11 @@ public class MimeMessage extends Message {
     }
 
     @Override
+    public String getPreview() {
+        return "";
+    }
+
+    @Override
     public boolean hasAttachments() {
         return false;
     }
@@ -667,15 +675,17 @@ public class MimeMessage extends Message {
          * header if any of its subparts are 8bit, so we automatically recurse
          * (as long as its not multipart/signed).
          */
-        if (mBody instanceof CompositeBody && !MimeUtility.isSameMimeType(type, "multipart/signed")) {
+        if (mBody instanceof CompositeBody
+                && !"multipart/signed".equalsIgnoreCase(type)) {
             setEncoding(MimeUtil.ENC_7BIT);
             // recurse
             ((CompositeBody) mBody).setUsing7bitTransport();
         } else if (!MimeUtil.ENC_8BIT
                 .equalsIgnoreCase(getFirstHeader(MimeHeader.HEADER_CONTENT_TRANSFER_ENCODING))) {
             return;
-        } else if (type != null &&
-                (MimeUtility.isSameMimeType(type, "multipart/signed") || MimeUtility.isMessage(type))) {
+        } else if (type != null
+                && (type.equalsIgnoreCase("multipart/signed") || type
+                        .toLowerCase(Locale.US).startsWith("message/"))) {
             /*
              * This shouldn't happen. In any case, it would be wrong to convert
              * them to some other encoding for 7bit transport.
@@ -709,23 +719,5 @@ public class MimeMessage extends Message {
         this.serverExtra = serverExtra;
     }
 
-    /**
-     * Convert a top level message into a bodypart.
-     * Returned body part shouldn't contain inappropriate headers such as smtp
-     * headers or MIME-VERSION.
-     * Both Message and MimeBodyPart might share structures.
-     * @return the body part
-     * @throws MessagingException
-     */
-    public MimeBodyPart toBodyPart() throws MessagingException {
-        MimeHeader contentHeaders = new MimeHeader();
-        for (String header : mHeader.getHeaderNames()) {
-            if (header.toLowerCase().startsWith("content-")) {
-                for (String value : mHeader.getHeader(header)) {
-                    contentHeaders.addHeader(header, value);
-                }
-            }
-        }
-        return new MimeBodyPart(contentHeaders, getBody());
-    }
+
 }

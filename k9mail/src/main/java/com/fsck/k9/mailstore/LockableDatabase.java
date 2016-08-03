@@ -25,7 +25,7 @@ public class LockableDatabase {
      * @param <T>
      *            Return value type for {@link #doDbWork(SQLiteDatabase)}
      */
-    public interface DbCallback<T> {
+    public static interface DbCallback<T> {
         /**
          * @param db
          *            The locked database on which the work should occur. Never
@@ -38,7 +38,7 @@ public class LockableDatabase {
         T doDbWork(SQLiteDatabase db) throws WrappedException, MessagingException;
     }
 
-    public interface SchemaDefinition {
+    public static interface SchemaDefinition {
         int getVersion();
 
         /**
@@ -135,7 +135,7 @@ public class LockableDatabase {
      *
      * @see #execute(boolean, DbCallback)
      */
-    private ThreadLocal<Boolean> inTransaction = new ThreadLocal<>();
+    private ThreadLocal<Boolean> inTransaction = new ThreadLocal<Boolean>();
 
     private SchemaDefinition mSchemaDefinition;
 
@@ -183,7 +183,10 @@ public class LockableDatabase {
         mReadLock.lock();
         try {
             getStorageManager().lockProvider(mStorageProviderId);
-        } catch (UnavailableStorageException | RuntimeException e) {
+        } catch (UnavailableStorageException e) {
+            mReadLock.unlock();
+            throw e;
+        } catch (RuntimeException e) {
             mReadLock.unlock();
             throw e;
         }
@@ -229,7 +232,10 @@ public class LockableDatabase {
         mWriteLock.lock();
         try {
             getStorageManager().lockProvider(providerId);
-        } catch (UnavailableStorageException | RuntimeException e) {
+        } catch (UnavailableStorageException e) {
+            mWriteLock.unlock();
+            throw e;
+        } catch (RuntimeException e) {
             mWriteLock.unlock();
             throw e;
         }
@@ -259,6 +265,8 @@ public class LockableDatabase {
      *            transactional context.
      * @param callback
      *            Never <code>null</code>.
+     *
+     * @param <T>
      * @return Whatever {@link DbCallback#doDbWork(SQLiteDatabase)} returns.
      * @throws UnavailableStorageException
      */
@@ -283,7 +291,7 @@ public class LockableDatabase {
                     if (debug) {
                         begin = System.currentTimeMillis();
                     } else {
-                        begin = 0L;
+                        begin = 0l;
                     }
                     // not doing endTransaction in the same 'finally' block of unlockRead() because endTransaction() may throw an exception
                     mDb.endTransaction();
@@ -370,11 +378,9 @@ public class LockableDatabase {
             try {
                 doOpenOrCreateDb(databaseFile);
             } catch (SQLiteException e) {
-                // TODO handle this error in a better way!
+                // try to gracefully handle DB corruption - see issue 2537
                 Log.w(K9.LOG_TAG, "Unable to open DB " + databaseFile + " - removing file and retrying", e);
-                if (databaseFile.exists() && !databaseFile.delete()) {
-                    Log.d(K9.LOG_TAG, "Failed to remove " + databaseFile + " that couldn't be opened");
-                }
+                databaseFile.delete();
                 doOpenOrCreateDb(databaseFile);
             }
             if (mDb.getVersion() != mSchemaDefinition.getVersion()) {
@@ -409,7 +415,6 @@ public class LockableDatabase {
         final File databaseParentDir = databaseFile.getParentFile();
         if (databaseParentDir.isFile()) {
             // should be safe to unconditionally delete clashing file: user is not supposed to mess with our directory
-            // noinspection ResultOfMethodCallIgnored
             databaseParentDir.delete();
         }
         if (!databaseParentDir.exists()) {
@@ -423,12 +428,10 @@ public class LockableDatabase {
         final File attachmentDir = storageManager.getAttachmentDirectory(uUid, providerId);
         final File attachmentParentDir = attachmentDir.getParentFile();
         if (!attachmentParentDir.exists()) {
-            // noinspection ResultOfMethodCallIgnored, TODO maybe throw UnavailableStorageException?
             attachmentParentDir.mkdirs();
             FileHelper.touchFile(attachmentParentDir, ".nomedia");
         }
         if (!attachmentDir.exists()) {
-            // noinspection ResultOfMethodCallIgnored, TODO maybe throw UnavailableStorageException?
             attachmentDir.mkdirs();
         }
         return databaseFile;
@@ -467,17 +470,11 @@ public class LockableDatabase {
                 final File[] attachments = attachmentDirectory.listFiles();
                 for (File attachment : attachments) {
                     if (attachment.exists()) {
-                        boolean attachmentWasDeleted = attachment.delete();
-                        if (!attachmentWasDeleted && K9.DEBUG) {
-                            Log.d(K9.LOG_TAG, "Attachment was not deleted!");
-                        }
+                        attachment.delete();
                     }
                 }
                 if (attachmentDirectory.exists()) {
-                    boolean attachmentDirectoryWasDeleted = attachmentDirectory.delete();
-                    if (!attachmentDirectoryWasDeleted && K9.DEBUG) {
-                        Log.d(K9.LOG_TAG, "Attachment directory was not deleted!");
-                    }
+                    attachmentDirectory.delete();
                 }
             } catch (Exception e) {
                 if (K9.DEBUG)
@@ -502,7 +499,7 @@ public class LockableDatabase {
 
     @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
     private void deleteDatabase(File database) {
-        boolean deleted;
+        boolean deleted = false;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
             deleted = SQLiteDatabase.deleteDatabase(database);
         } else {

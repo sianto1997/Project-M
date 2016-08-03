@@ -2,13 +2,12 @@ package com.fsck.k9.activity.setup;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
 import android.os.Bundle;
 import android.preference.*;
 import com.fsck.k9.*;
 import com.fsck.k9.activity.K9PreferenceActivity;
-import com.fsck.k9.preferences.Storage;
-import com.fsck.k9.preferences.StorageEditor;
-
 
 /**
  * Activity to configure the font size of the information displayed in the
@@ -179,8 +178,8 @@ public class FontSizeSettings extends K9PreferenceActivity {
 
         fontSizes.setMessageComposeInput(Integer.parseInt(mMessageComposeInput.getValue()));
 
-        Storage storage = Preferences.getPreferences(this).getStorage();
-        StorageEditor editor = storage.edit();
+        SharedPreferences preferences = Preferences.getPreferences(this).getPreferences();
+        Editor editor = preferences.edit();
         fontSizes.save(editor);
         editor.commit();
     }

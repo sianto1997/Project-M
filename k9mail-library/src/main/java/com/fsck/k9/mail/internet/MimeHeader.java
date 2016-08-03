@@ -8,14 +8,14 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.Charset;
 import java.util.*;
 
-import android.support.annotation.NonNull;
+public class MimeHeader {
+    private static final String[] EMPTY_STRING_ARRAY = new String[0];
 
-
-public class MimeHeader implements Cloneable {
     public static final String HEADER_CONTENT_TYPE = "Content-Type";
     public static final String HEADER_CONTENT_TRANSFER_ENCODING = "Content-Transfer-Encoding";
     public static final String HEADER_CONTENT_DISPOSITION = "Content-Disposition";
     public static final String HEADER_CONTENT_ID = "Content-ID";
+
 
     private List<Field> mFields = new ArrayList<Field>();
     private String mCharset = null;
@@ -50,7 +50,6 @@ public class MimeHeader implements Cloneable {
         addHeader(name, value);
     }
 
-    @NonNull
     public Set<String> getHeaderNames() {
         Set<String> names = new LinkedHashSet<String>();
         for (Field field : mFields) {
@@ -59,7 +58,6 @@ public class MimeHeader implements Cloneable {
         return names;
     }
 
-    @NonNull
     public String[] getHeader(String name) {
         List<String> values = new ArrayList<String>();
         for (Field field : mFields) {
@@ -67,7 +65,7 @@ public class MimeHeader implements Cloneable {
                 values.add(field.getValue());
             }
         }
-        return values.toArray(new String[values.size()]);
+        return values.toArray(EMPTY_STRING_ARRAY);
     }
 
     public void removeHeader(String name) {
@@ -78,19 +76,6 @@ public class MimeHeader implements Cloneable {
             }
         }
         mFields.removeAll(removeFields);
-    }
-
-    public String toString() {
-        StringBuilder builder = new StringBuilder();
-        for (Field field : mFields) {
-            if (field.hasRawData()) {
-                builder.append(field.getRaw());
-            } else {
-                writeNameValueField(builder, field);
-            }
-            builder.append('\r').append('\n');
-        }
-        return builder.toString();
     }
 
     public void writeTo(OutputStream out) throws IOException {
@@ -121,23 +106,6 @@ public class MimeHeader implements Cloneable {
         writer.write(field.getName());
         writer.write(": ");
         writer.write(value);
-    }
-
-    private void writeNameValueField(StringBuilder builder, Field field) {
-        String value = field.getValue();
-
-        if (hasToBeEncoded(value)) {
-            Charset charset = null;
-
-            if (mCharset != null) {
-                charset = Charset.forName(mCharset);
-            }
-            value = EncoderUtil.encodeEncodedWord(field.getValue(), charset);
-        }
-
-        builder.append(field.getName());
-        builder.append(": ");
-        builder.append(value);
     }
 
     // encode non printable characters except LF/CR/TAB codes.
@@ -225,12 +193,11 @@ public class MimeHeader implements Cloneable {
 
     @Override
     public MimeHeader clone() {
-        try {
-            MimeHeader header = (MimeHeader) super.clone();
-            header.mFields = new ArrayList<Field>(mFields);
-            return header;
-        } catch(CloneNotSupportedException e) {
-            throw new AssertionError(e);
-        }
+        MimeHeader header = new MimeHeader();
+        header.mCharset = mCharset;
+
+        header.mFields = new ArrayList<Field>(mFields);
+
+        return header;
     }
 }

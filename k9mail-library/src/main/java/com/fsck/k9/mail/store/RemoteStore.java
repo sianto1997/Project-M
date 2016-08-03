@@ -11,7 +11,6 @@ import com.fsck.k9.mail.ssl.DefaultTrustedSocketFactory;
 import com.fsck.k9.mail.ssl.TrustedSocketFactory;
 import com.fsck.k9.mail.store.imap.ImapStore;
 import com.fsck.k9.mail.store.pop3.Pop3Store;
-import com.fsck.k9.mail.store.webdav.WebDavHttpClient;
 import com.fsck.k9.mail.store.webdav.WebDavStore;
 
 import java.util.HashMap;
@@ -56,7 +55,7 @@ public abstract class RemoteStore extends Store {
                 store = new Pop3Store(storeConfig,
                         new DefaultTrustedSocketFactory(context));
             } else if (uri.startsWith("webdav")) {
-                store = new WebDavStore(storeConfig, new WebDavHttpClient.WebDavHttpClientFactory());
+                store = new WebDavStore(storeConfig);
             }
 
             if (store != null) {

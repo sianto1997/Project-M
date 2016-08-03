@@ -70,13 +70,9 @@ public class FileHelper {
         final File file = new File(parentDir, name);
         try {
             if (!file.exists()) {
-                if (!file.createNewFile()) {
-                    Log.d(K9.LOG_TAG, "Unable to create file: " + file.getAbsolutePath());
-                }
+                file.createNewFile();
             } else {
-                if (!file.setLastModified(System.currentTimeMillis())) {
-                    Log.d(K9.LOG_TAG, "Unable to change last modification date: " + file.getAbsolutePath());
-                }
+                file.setLastModified(System.currentTimeMillis());
             }
         } catch (Exception e) {
             Log.d(K9.LOG_TAG, "Unable to touch file: " + file.getAbsolutePath(), e);
@@ -85,14 +81,9 @@ public class FileHelper {
 
     public static boolean move(final File from, final File to) {
         if (to.exists()) {
-            if (!to.delete()) {
-                Log.d(K9.LOG_TAG, "Unable to delete file: " + to.getAbsolutePath());
-            }
+            to.delete();
         }
-
-        if (!to.getParentFile().mkdirs()) {
-            Log.d(K9.LOG_TAG, "Unable to make directories: " + to.getParentFile().getAbsolutePath());
-        }
+        to.getParentFile().mkdirs();
 
         try {
             FileInputStream in = new FileInputStream(from);
@@ -110,10 +101,7 @@ public class FileHelper {
             } finally {
                 try { in.close(); } catch (Throwable ignore) {}
             }
-
-            if (!from.delete()) {
-                Log.d(K9.LOG_TAG, "Unable to delete file: " + from.getAbsolutePath());
-            }
+            from.delete();
             return true;
         } catch (Exception e) {
             Log.w(K9.LOG_TAG, "cannot move " + from.getAbsolutePath() + " to " + to.getAbsolutePath(), e);
@@ -140,9 +128,7 @@ public class FileHelper {
         }
         if (!toDir.exists() || !toDir.isDirectory()) {
             if (toDir.exists()) {
-                if (!toDir.delete()) {
-                    Log.d(K9.LOG_TAG, "Unable to delete file: " + toDir.getAbsolutePath());
-                }
+                toDir.delete();
             }
             if (!toDir.mkdirs()) {
                 Log.w(K9.LOG_TAG, "cannot create directory " + toDir.getAbsolutePath());
@@ -152,9 +138,7 @@ public class FileHelper {
         for (File file : files) {
             if (file.isDirectory()) {
                 moveRecursive(file, new File(toDir, file.getName()));
-                if (!file.delete()) {
-                    Log.d(K9.LOG_TAG, "Unable to delete file: " + toDir.getAbsolutePath());
-                }
+                file.delete();
             } else {
                 File target = new File(toDir, file.getName());
                 if (!file.renameTo(target)) {

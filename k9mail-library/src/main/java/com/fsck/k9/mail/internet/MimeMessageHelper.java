@@ -26,21 +26,16 @@ public class MimeMessageHelper {
             String mimeType = multipart.getMimeType();
             String contentType = String.format("%s; boundary=\"%s\"", mimeType, multipart.getBoundary());
             part.setHeader(MimeHeader.HEADER_CONTENT_TYPE, contentType);
-            if (MimeUtility.isSameMimeType(mimeType, "multipart/signed")) {
+            if ("multipart/signed".equalsIgnoreCase(mimeType)) {
                 setEncoding(part, MimeUtil.ENC_7BIT);
             } else {
                 setEncoding(part, MimeUtil.ENC_8BIT);
             }
         } else if (body instanceof TextBody) {
-            String contentType;
-            if (MimeUtility.mimeTypeMatches(part.getMimeType(), "text/*")) {
-                contentType = String.format("%s;\r\n charset=utf-8", part.getMimeType());
-                String name = MimeUtility.getHeaderParameter(part.getContentType(), "name");
-                if (name != null) {
-                    contentType += String.format(";\r\n name=\"%s\"", name);
-                }
-            } else {
-                contentType = part.getMimeType();
+            String contentType = String.format("%s;\r\n charset=utf-8", part.getMimeType());
+            String name = MimeUtility.getHeaderParameter(part.getContentType(), "name");
+            if (name != null) {
+                contentType += String.format(";\r\n name=\"%s\"", name);
             }
             part.setHeader(MimeHeader.HEADER_CONTENT_TYPE, contentType);
 

@@ -9,7 +9,6 @@ import com.fsck.k9.mail.Multipart;
 import com.fsck.k9.mail.Part;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.james.mime4j.codec.Base64InputStream;
 import org.apache.james.mime4j.codec.QuotedPrintableInputStream;
 import org.apache.james.mime4j.util.MimeUtil;
@@ -17,11 +16,8 @@ import org.apache.james.mime4j.util.MimeUtil;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
 import java.util.Locale;
 import java.util.regex.Pattern;
-
-import android.support.annotation.NonNull;
 
 
 public class MimeUtility {
@@ -34,11 +30,10 @@ public class MimeUtility {
      * http://www.stdicon.com/mimetypes
      */
     private static final String[][] MIME_TYPE_BY_EXTENSION_MAP = new String[][] {
-    //* Do not delete the next three lines
+        //* Do not delete the next two lines
     { "", DEFAULT_ATTACHMENT_MIME_TYPE },
     { "k9s", K9_SETTINGS_MIME_TYPE},
-    { "txt", "text/plain"},
-    //* Do not delete the previous three lines
+    //* Do not delete the previous two lines
     { "123", "application/vnd.lotus-1-2-3"},
     { "323", "text/h323"},
     { "3dml", "text/vnd.in3d.3dml"},
@@ -553,7 +548,6 @@ public class MimeUtility {
     { "pkg", "application/octet-stream"},
     { "pki", "application/pkixcmp"},
     { "pkipath", "application/pkix-pkipath"},
-    { "pkpass", "application/vnd-com.apple.pkpass"},
     { "pko", "application/ynd.ms-pkipko"},
     { "plb", "application/vnd.3gpp.pic-bw-large"},
     { "plc", "application/vnd.mobius.plc"},
@@ -954,7 +948,7 @@ public class MimeUtility {
         return null;
     }
 
-    public static Part findFirstPartByMimeType(Part part, String mimeType) {
+    public static Part findFirstPartByMimeType(Part part, String mimeType) throws MessagingException {
         if (part.getBody() instanceof Multipart) {
             Multipart multipart = (Multipart)part.getBody();
             for (BodyPart bodyPart : multipart.getBodyParts()) {
@@ -963,7 +957,7 @@ public class MimeUtility {
                     return ret;
                 }
             }
-        } else if (isSameMimeType(part.getMimeType(), mimeType)) {
+        } else if (part.getMimeType().equalsIgnoreCase(mimeType)) {
             return part;
         }
         return null;
@@ -982,11 +976,11 @@ public class MimeUtility {
     }
 
     public static boolean isDefaultMimeType(String mimeType) {
-        return isSameMimeType(mimeType, DEFAULT_ATTACHMENT_MIME_TYPE);
+        return DEFAULT_ATTACHMENT_MIME_TYPE.equalsIgnoreCase(mimeType);
     }
 
     public static Body createBody(InputStream in, String contentTransferEncoding, String contentType)
-            throws IOException {
+            throws IOException, MessagingException {
 
         if (contentTransferEncoding != null) {
             contentTransferEncoding = MimeUtility.getHeaderParameter(contentTransferEncoding, null);
@@ -1025,8 +1019,7 @@ public class MimeUtility {
             RawDataBody rawDataBody = (RawDataBody) body;
             String encoding = rawDataBody.getEncoding();
             final InputStream rawInputStream = rawDataBody.getInputStream();
-            if (MimeUtil.ENC_7BIT.equalsIgnoreCase(encoding) || MimeUtil.ENC_8BIT.equalsIgnoreCase(encoding)
-                    || MimeUtil.ENC_BINARY.equalsIgnoreCase(encoding)) {
+            if (MimeUtil.ENC_7BIT.equalsIgnoreCase(encoding) || MimeUtil.ENC_8BIT.equalsIgnoreCase(encoding)) {
                 inputStream = rawInputStream;
             } else if (MimeUtil.ENC_BASE64.equalsIgnoreCase(encoding)) {
                 inputStream = new Base64InputStream(rawInputStream, false) {
@@ -1045,7 +1038,7 @@ public class MimeUtility {
                     }
                 };
             } else {
-                throw new UnsupportedOperationException("Encoding for RawDataBody not supported: " + encoding);
+                throw new RuntimeException("Encoding for RawDataBody not supported: " + encoding);
             }
         } else {
             inputStream = body.getInputStream();
@@ -1072,7 +1065,7 @@ public class MimeUtility {
         }
         // If the MIME type set by the user's mailer is application/octet-stream, try to figure
         // out whether there's a sane file type extension.
-        if (returnedType != null && !isSameMimeType(returnedType, DEFAULT_ATTACHMENT_MIME_TYPE)) {
+        if (returnedType != null && !DEFAULT_ATTACHMENT_MIME_TYPE.equalsIgnoreCase(returnedType)) {
             return returnedType;
         } else if (extension != null) {
             for (String[] contentTypeMapEntry : MIME_TYPE_BY_EXTENSION_MAP) {
@@ -1085,7 +1078,7 @@ public class MimeUtility {
         return DEFAULT_ATTACHMENT_MIME_TYPE;
     }
 
-    public static String getExtensionByMimeType(@NonNull String mimeType) {
+    public static String getExtensionByMimeType(String mimeType) {
         String lowerCaseMimeType = mimeType.toLowerCase(Locale.US);
         for (String[] contentTypeMapEntry : MIME_TYPE_BY_EXTENSION_MAP) {
             if (contentTypeMapEntry[1].equals(lowerCaseMimeType)) {
@@ -1118,24 +1111,12 @@ public class MimeUtility {
             return (MimeUtil.ENC_BASE64);
         } else if (MimeUtil.isMessage(type)) {
             return (MimeUtil.ENC_8BIT);
-        } else if (isSameMimeType(type, "multipart/signed") || isMessage(type)) {
+        } else if ("multipart/signed".equalsIgnoreCase(type) || type.toLowerCase(Locale.US).startsWith("message/")) {
             return (MimeUtil.ENC_7BIT);
-        } else if (isMultipart(type)) {
+        } else if (type.toLowerCase(Locale.US).startsWith("multipart/")) {
             return (MimeUtil.ENC_8BIT);
         } else {
             return (MimeUtil.ENC_BASE64);
         }
-    }
-
-    public static boolean isMultipart(String mimeType) {
-        return mimeType != null && mimeType.toLowerCase(Locale.US).startsWith("multipart/");
-    }
-
-    public static boolean isMessage(String mimeType) {
-        return isSameMimeType(mimeType, "message/rfc822");
-    }
-
-    public static boolean isSameMimeType(String mimeType, String otherMimeType) {
-        return mimeType != null && mimeType.equalsIgnoreCase(otherMimeType);
     }
 }

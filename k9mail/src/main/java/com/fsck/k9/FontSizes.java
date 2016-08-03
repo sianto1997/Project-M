@@ -1,12 +1,10 @@
 package com.fsck.k9;
 
+import android.content.SharedPreferences;
 import android.util.TypedValue;
 import android.widget.TextView;
 
 import com.fsck.k9.preferences.GlobalSettings;
-import com.fsck.k9.preferences.Storage;
-import com.fsck.k9.preferences.StorageEditor;
-
 
 /**
  * Manage font size of the information displayed in the account list, folder
@@ -159,7 +157,7 @@ public class FontSizes {
      *
      * @param editor Used to save the font size settings.
      */
-    public void save(StorageEditor editor) {
+    public void save(SharedPreferences.Editor editor) {
         editor.putInt(ACCOUNT_NAME, accountName);
         editor.putInt(ACCOUNT_DESCRIPTION, accountDescription);
 
@@ -185,40 +183,40 @@ public class FontSizes {
     /**
      * Load the font size settings from permanent storage.
      *
-     * @param storage Used to load the font size settings.
+     * @param prefs Used to load the font size settings.
      */
-    public void load(Storage storage) {
-        accountName = storage.getInt(ACCOUNT_NAME, accountName);
-        accountDescription = storage.getInt(ACCOUNT_DESCRIPTION, accountDescription);
+    public void load(SharedPreferences prefs) {
+        accountName = prefs.getInt(ACCOUNT_NAME, accountName);
+        accountDescription = prefs.getInt(ACCOUNT_DESCRIPTION, accountDescription);
 
-        folderName = storage.getInt(FOLDER_NAME, folderName);
-        folderStatus = storage.getInt(FOLDER_STATUS, folderStatus);
+        folderName = prefs.getInt(FOLDER_NAME, folderName);
+        folderStatus = prefs.getInt(FOLDER_STATUS, folderStatus);
 
-        messageListSubject = storage.getInt(MESSAGE_LIST_SUBJECT, messageListSubject);
-        messageListSender = storage.getInt(MESSAGE_LIST_SENDER, messageListSender);
-        messageListDate = storage.getInt(MESSAGE_LIST_DATE, messageListDate);
-        messageListPreview = storage.getInt(MESSAGE_LIST_PREVIEW, messageListPreview);
+        messageListSubject = prefs.getInt(MESSAGE_LIST_SUBJECT, messageListSubject);
+        messageListSender = prefs.getInt(MESSAGE_LIST_SENDER, messageListSender);
+        messageListDate = prefs.getInt(MESSAGE_LIST_DATE, messageListDate);
+        messageListPreview = prefs.getInt(MESSAGE_LIST_PREVIEW, messageListPreview);
 
-        messageViewSender = storage.getInt(MESSAGE_VIEW_SENDER, messageViewSender);
-        messageViewTo = storage.getInt(MESSAGE_VIEW_TO, messageViewTo);
-        messageViewCC = storage.getInt(MESSAGE_VIEW_CC, messageViewCC);
-        messageViewAdditionalHeaders = storage.getInt(MESSAGE_VIEW_ADDITIONAL_HEADERS, messageViewAdditionalHeaders);
-        messageViewSubject = storage.getInt(MESSAGE_VIEW_SUBJECT, messageViewSubject);
-        messageViewDate = storage.getInt(MESSAGE_VIEW_DATE, messageViewDate);
+        messageViewSender = prefs.getInt(MESSAGE_VIEW_SENDER, messageViewSender);
+        messageViewTo = prefs.getInt(MESSAGE_VIEW_TO, messageViewTo);
+        messageViewCC = prefs.getInt(MESSAGE_VIEW_CC, messageViewCC);
+        messageViewAdditionalHeaders = prefs.getInt(MESSAGE_VIEW_ADDITIONAL_HEADERS, messageViewAdditionalHeaders);
+        messageViewSubject = prefs.getInt(MESSAGE_VIEW_SUBJECT, messageViewSubject);
+        messageViewDate = prefs.getInt(MESSAGE_VIEW_DATE, messageViewDate);
 
-        loadMessageViewContentPercent(storage);
+        loadMessageViewContentPercent(prefs);
 
-        messageComposeInput = storage.getInt(MESSAGE_COMPOSE_INPUT, messageComposeInput);
+        messageComposeInput = prefs.getInt(MESSAGE_COMPOSE_INPUT, messageComposeInput);
     }
 
-    private void loadMessageViewContentPercent(Storage storage) {
+    private void loadMessageViewContentPercent(SharedPreferences prefs) {
         int fallbackValue = 100;
-        if (!storage.contains(MESSAGE_VIEW_CONTENT_PERCENT)) {
-            int oldValue = storage.getInt(MESSAGE_VIEW_CONTENT, 3);
+        if (!prefs.contains(MESSAGE_VIEW_CONTENT_PERCENT)) {
+            int oldValue = prefs.getInt(MESSAGE_VIEW_CONTENT, 3);
             fallbackValue = GlobalSettings.SettingsUpgraderV31.convertFromOldSize(oldValue);
         }
 
-        setMessageViewContentAsPercent(storage.getInt(MESSAGE_VIEW_CONTENT_PERCENT, fallbackValue));
+        setMessageViewContentAsPercent(prefs.getInt(MESSAGE_VIEW_CONTENT_PERCENT, fallbackValue));
     }
 
     public int getAccountName() {

@@ -13,7 +13,7 @@ import java.util.Locale;
  * Represents an IMAP list response and is also the base class for the
  * ImapResponse.
  */
-class ImapList extends ArrayList<Object> {
+public class ImapList extends ArrayList<Object> {
     private static final long serialVersionUID = -4067248341419617583L;
     private static final DateFormat DATE_FORMAT = new SimpleDateFormat("dd-MMM-yyyy HH:mm:ss Z", Locale.US);
     private static final DateFormat BAD_DATE_TIME_FORMAT = new SimpleDateFormat("dd MMM yyyy HH:mm:ss Z", Locale.US);
@@ -24,20 +24,12 @@ class ImapList extends ArrayList<Object> {
         return (ImapList)get(index);
     }
 
-    public boolean isList(int index) {
-        return inRange(index) && get(index) instanceof ImapList;
-    }
-
     public Object getObject(int index) {
         return get(index);
     }
 
     public String getString(int index) {
         return (String)get(index);
-    }
-
-    public boolean isString(int index) {
-        return inRange(index) && get(index) instanceof String;
     }
 
     public long getLong(int index) {
@@ -52,7 +44,7 @@ class ImapList extends ArrayList<Object> {
         return getDate(getString(index));
     }
 
-    public Date getKeyedDate(String key) throws MessagingException {
+    public Date getKeyedDate(Object key) throws MessagingException {
         return getDate(getKeyedString(key));
     }
 
@@ -68,7 +60,7 @@ class ImapList extends ArrayList<Object> {
     }
 
 
-    public Object getKeyedValue(String key) {
+    public Object getKeyedValue(Object key) {
         for (int i = 0, count = size() - 1; i < count; i++) {
             if (ImapResponseParser.equalsIgnoreCase(get(i), key)) {
                 return get(i + 1);
@@ -77,43 +69,39 @@ class ImapList extends ArrayList<Object> {
         return null;
     }
 
-    public ImapList getKeyedList(String key) {
+    public ImapList getKeyedList(Object key) {
         return (ImapList)getKeyedValue(key);
     }
 
-    public String getKeyedString(String key) {
+    public String getKeyedString(Object key) {
         return (String)getKeyedValue(key);
     }
 
-    public int getKeyedNumber(String key) {
+    public int getKeyedNumber(Object key) {
         return Integer.parseInt(getKeyedString(key));
     }
 
-    public boolean containsKey(String key) {
+    public boolean containsKey(Object key) {
         if (key == null) {
             return false;
         }
 
         for (int i = 0, count = size() - 1; i < count; i++) {
-            if (ImapResponseParser.equalsIgnoreCase(get(i), key)) {
+            if (ImapResponseParser.equalsIgnoreCase(key, get(i))) {
                 return true;
             }
         }
         return false;
     }
 
-    public int getKeyIndex(String key) {
+    public int getKeyIndex(Object key) {
         for (int i = 0, count = size() - 1; i < count; i++) {
-            if (ImapResponseParser.equalsIgnoreCase(get(i), key)) {
+            if (ImapResponseParser.equalsIgnoreCase(key, get(i))) {
                 return i;
             }
         }
 
         throw new IllegalArgumentException("getKeyIndex() only works for keys that are in the collection.");
-    }
-
-    private boolean inRange(int index) {
-        return index >= 0 && index < size();
     }
 
     private Date parseDate(String value) throws ParseException {

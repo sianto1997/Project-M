@@ -67,7 +67,6 @@ import com.fsck.k9.FontSizes;
 import com.fsck.k9.K9;
 import com.fsck.k9.Preferences;
 import com.fsck.k9.R;
-import com.fsck.k9.activity.compose.MessageActions;
 import com.fsck.k9.activity.misc.ExtendedAsyncTask;
 import com.fsck.k9.activity.misc.NonConfigurationInstance;
 import com.fsck.k9.activity.setup.AccountSettings;
@@ -79,6 +78,7 @@ import com.fsck.k9.helper.SizeFormatter;
 import com.fsck.k9.mail.AuthType;
 import com.fsck.k9.mail.ServerSettings;
 import com.fsck.k9.mail.Transport;
+import com.fsck.k9.mail.internet.MimeUtility;
 import com.fsck.k9.mail.store.RemoteStore;
 import com.fsck.k9.mailstore.StorageManager;
 import com.fsck.k9.preferences.SettingsExporter;
@@ -154,12 +154,12 @@ public class Accounts extends K9ListActivity implements OnItemClickListener {
             if (mUnreadMessageCount == 0) {
                 mActionBarUnread.setVisibility(View.GONE);
             } else {
-                mActionBarUnread.setText(String.format("%d", mUnreadMessageCount));
+                mActionBarUnread.setText(Integer.toString(mUnreadMessageCount));
                 mActionBarUnread.setVisibility(View.VISIBLE);
             }
 
             String operation = mListener.getOperation(Accounts.this);
-            operation = operation.trim();
+            operation.trim();
             if (operation.length() < 1) {
                 mActionBarSubTitle.setVisibility(View.GONE);
             } else {
@@ -368,6 +368,23 @@ public class Accounts extends K9ListActivity implements OnItemClickListener {
         search.and(SearchField.READ, "1", Attribute.NOT_EQUALS);
 
         return search;
+    }
+
+
+    @Override
+    public void onNewIntent(Intent intent) {
+        Uri uri = intent.getData();
+        Log.i(K9.LOG_TAG, "Accounts Activity got uri " + uri);
+        if (uri != null) {
+            ContentResolver contentResolver = getContentResolver();
+
+            Log.i(K9.LOG_TAG, "Accounts Activity got content of type " + contentResolver.getType(uri));
+
+            String contentType = contentResolver.getType(uri);
+            if (MimeUtility.K9_SETTINGS_MIME_TYPE.equals(contentType)) {
+                onImport(uri);
+            }
+        }
     }
 
     @Override
@@ -626,7 +643,7 @@ public class Accounts extends K9ListActivity implements OnItemClickListener {
     private void onCompose() {
         Account defaultAccount = Preferences.getPreferences(this).getDefaultAccount();
         if (defaultAccount != null) {
-            MessageActions.actionCompose(this, defaultAccount);
+            MessageCompose.actionCompose(this, defaultAccount);
         } else {
             onAddNewAccount();
         }
@@ -812,7 +829,8 @@ public class Accounts extends K9ListActivity implements OnItemClickListener {
             mDialog = builder.create();
 
             // Use the dialog's layout inflater so its theme is used (and not the activity's theme).
-            View layout = mDialog.getLayoutInflater().inflate(R.layout.accounts_password_prompt, scrollView);
+            View layout = mDialog.getLayoutInflater().inflate(
+                              R.layout.accounts_password_prompt, null);
 
             // Set the intro text that tells the user what to do
             TextView intro = (TextView) layout.findViewById(R.id.password_prompt_intro);
@@ -871,6 +889,9 @@ public class Accounts extends K9ListActivity implements OnItemClickListener {
             } else {
                 layout.findViewById(R.id.outgoing_server_prompt).setVisibility(View.GONE);
             }
+
+            // Add the layout to the ScrollView
+            scrollView.addView(layout);
 
             // Show the dialog
             mDialog.show();
@@ -1262,8 +1283,7 @@ public class Accounts extends K9ListActivity implements OnItemClickListener {
         new String[] {"Android-PullToRefresh", "https://github.com/chrisbanes/Android-PullToRefresh"},
         new String[] {"ckChangeLog", "https://github.com/cketti/ckChangeLog"},
         new String[] {"HoloColorPicker", "https://github.com/LarsWerkman/HoloColorPicker"},
-        new String[] {"Glide", "https://github.com/bumptech/glide"},
-        new String[] {"TokenAutoComplete", "https://github.com/splitwise/TokenAutoComplete/"},
+        new String[] {"Glide", "https://github.com/bumptech/glide"}
     };
 
     private void onAbout() {
@@ -1769,10 +1789,10 @@ public class Accounts extends K9ListActivity implements OnItemClickListener {
             Integer unreadMessageCount = null;
             if (stats != null) {
                 unreadMessageCount = stats.unreadMessageCount;
-                holder.newMessageCount.setText(String.format("%d", unreadMessageCount));
+                holder.newMessageCount.setText(Integer.toString(unreadMessageCount));
                 holder.newMessageCountWrapper.setVisibility(unreadMessageCount > 0 ? View.VISIBLE : View.GONE);
 
-                holder.flaggedMessageCount.setText(String.format("%d", stats.flaggedMessageCount));
+                holder.flaggedMessageCount.setText(Integer.toString(stats.flaggedMessageCount));
                 holder.flaggedMessageCountWrapper.setVisibility(K9.messageListStars() && stats.flaggedMessageCount > 0 ? View.VISIBLE : View.GONE);
 
                 holder.flaggedMessageCountWrapper.setOnClickListener(createFlaggedSearchListener(account));

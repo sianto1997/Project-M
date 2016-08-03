@@ -51,7 +51,8 @@ public class MessageTitleView extends TextView {
                 if (getLayout().getLineCount() > MAX_LINES) {
                     int lineEndIndex = getLayout().getLineEnd(MAX_LINES - 1);
                     setText(getText().subSequence(0, lineEndIndex - 2) + ELLIPSIS);
-                    mHeader.showSubjectLine();
+                } else {
+                    mHeader.hideSubjectLine();
                 }
                 mNeedEllipsizeCheck = false;
             }

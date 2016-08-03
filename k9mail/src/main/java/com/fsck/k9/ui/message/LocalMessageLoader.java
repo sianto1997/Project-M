@@ -57,8 +57,4 @@ public class LocalMessageLoader extends AsyncTaskLoader<LocalMessage> {
     private LocalMessage loadMessageFromDatabase() throws MessagingException {
         return controller.loadMessage(account, messageReference.getFolderName(), messageReference.getUid());
     }
-
-    public boolean isCreatedFor(MessageReference messageReference) {
-        return this.messageReference.equals(messageReference);
-    }
 }

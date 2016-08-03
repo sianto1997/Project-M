@@ -10,7 +10,6 @@ import java.util.Collections;
 import java.util.List;
 
 import android.content.Context;
-import android.net.SSLCertificateSocketFactory;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -164,11 +163,7 @@ public class DefaultTrustedSocketFactory implements TrustedSocketFactory {
         } else {
             trustedSocket = socketFactory.createSocket(socket, host, port, true);
         }
-
-        SSLSocket sslSocket = (SSLSocket) trustedSocket;
-        hardenSocket(sslSocket);
-        setSniHost(socketFactory, sslSocket, host);
-
+        hardenSocket((SSLSocket) trustedSocket);
         return trustedSocket;
     }
 
@@ -178,24 +173,6 @@ public class DefaultTrustedSocketFactory implements TrustedSocketFactory {
         }
         if (ENABLED_PROTOCOLS != null) {
             sock.setEnabledProtocols(ENABLED_PROTOCOLS);
-        }
-    }
-
-    public static void setSniHost(SSLSocketFactory factory, SSLSocket socket, String hostname) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR1 &&
-                factory instanceof android.net.SSLCertificateSocketFactory) {
-            SSLCertificateSocketFactory sslCertificateSocketFactory = (SSLCertificateSocketFactory) factory;
-            sslCertificateSocketFactory.setHostname(socket, hostname);
-        } else {
-            setHostnameViaReflection(socket, hostname);
-        }
-    }
-
-    private static void setHostnameViaReflection(SSLSocket socket, String hostname) {
-        try {
-            socket.getClass().getMethod("setHostname", String.class).invoke(socket, hostname);
-        } catch (Throwable e) {
-            Log.e(LOG_TAG, "Could not call SSLSocket#setHostname(String) method ", e);
         }
     }
 }

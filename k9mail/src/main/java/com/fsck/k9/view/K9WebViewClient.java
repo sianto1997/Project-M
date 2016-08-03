@@ -2,6 +2,7 @@ package com.fsck.k9.view;
 
 
 import java.io.InputStream;
+import java.util.Stack;
 
 import android.annotation.TargetApi;
 import android.content.ActivityNotFoundException;
@@ -12,7 +13,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Build.VERSION_CODES;
 import android.provider.Browser;
-import android.support.annotation.Nullable;
 import android.text.TextUtils;
 import android.util.Log;
 import android.webkit.WebResourceRequest;
@@ -21,35 +21,34 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import com.fsck.k9.K9;
-import com.fsck.k9.mailstore.AttachmentResolver;
-import com.fsck.k9.view.MessageWebView.OnPageFinishedListener;
+import com.fsck.k9.mail.Body;
+import com.fsck.k9.mail.Multipart;
+import com.fsck.k9.mail.Part;
+import com.fsck.k9.mailstore.AttachmentViewInfo;
+import com.fsck.k9.mailstore.LocalMessageExtractor;
 
 
 /**
  * {@link WebViewClient} that intercepts requests for {@code cid:} URIs to load the respective body part.
  */
-abstract class K9WebViewClient extends WebViewClient {
+public abstract class K9WebViewClient extends WebViewClient {
     private static final String CID_SCHEME = "cid";
     private static final WebResourceResponse RESULT_DO_NOT_INTERCEPT = null;
     private static final WebResourceResponse RESULT_DUMMY_RESPONSE = new WebResourceResponse(null, null, null);
-    private OnPageFinishedListener onPageFinishedListener;
 
-
-    @Nullable
-    private final AttachmentResolver attachmentResolver;
-
-
-    public static K9WebViewClient newInstance(@Nullable AttachmentResolver attachmentResolver) {
+    public static WebViewClient newInstance(Part part) {
         if (Build.VERSION.SDK_INT < 21) {
-            return new PreLollipopWebViewClient(attachmentResolver);
+            return new PreLollipopWebViewClient(part);
         }
 
-        return new LollipopWebViewClient(attachmentResolver);
+        return new LollipopWebViewClient(part);
     }
 
 
-    private K9WebViewClient(@Nullable AttachmentResolver attachmentResolver) {
-        this.attachmentResolver = attachmentResolver;
+    private final Part part;
+
+    private K9WebViewClient(Part part) {
+        this.part = part;
     }
 
     @Override
@@ -89,25 +88,22 @@ abstract class K9WebViewClient extends WebViewClient {
             return RESULT_DO_NOT_INTERCEPT;
         }
 
-        if (attachmentResolver == null) {
-            return RESULT_DUMMY_RESPONSE;
-        }
-
         String cid = uri.getSchemeSpecificPart();
         if (TextUtils.isEmpty(cid)) {
             return RESULT_DUMMY_RESPONSE;
         }
 
-        Uri attachmentUri = attachmentResolver.getAttachmentUriForContentId(cid);
-        if (attachmentUri == null) {
+        Part part = getPartForContentId(cid);
+        if (part == null) {
             return RESULT_DUMMY_RESPONSE;
         }
 
         Context context = webView.getContext();
         ContentResolver contentResolver = context.getContentResolver();
         try {
-            String mimeType = contentResolver.getType(attachmentUri);
-            InputStream inputStream = contentResolver.openInputStream(attachmentUri);
+            AttachmentViewInfo attachmentInfo = LocalMessageExtractor.extractAttachmentInfo(context, part);
+            String mimeType = attachmentInfo.mimeType;
+            InputStream inputStream = contentResolver.openInputStream(attachmentInfo.uri);
 
             return new WebResourceResponse(mimeType, null, inputStream);
         } catch (Exception e) {
@@ -116,22 +112,32 @@ abstract class K9WebViewClient extends WebViewClient {
         }
     }
 
-    public void setOnPageFinishedListener(OnPageFinishedListener onPageFinishedListener) {
-        this.onPageFinishedListener = onPageFinishedListener;
+    private Part getPartForContentId(String cid) {
+        Stack<Part> partsToCheck = new Stack<Part>();
+        partsToCheck.push(part);
+
+        while (!partsToCheck.isEmpty()) {
+            Part part = partsToCheck.pop();
+
+            Body body = part.getBody();
+            if (body instanceof Multipart) {
+                Multipart multipart = (Multipart) body;
+                for (Part bodyPart : multipart.getBodyParts()) {
+                    partsToCheck.push(bodyPart);
+                }
+            } else if (cid.equals(part.getContentId())) {
+                return part;
+            }
+        }
+
+        return null;
     }
 
-    @Override
-    public void onPageFinished(WebView view, String url) {
-        super.onPageFinished(view, url);
-        if (onPageFinishedListener != null) {
-            onPageFinishedListener.onPageFinished();
-        }
-    }
 
     @SuppressWarnings("deprecation")
     private static class PreLollipopWebViewClient extends K9WebViewClient {
-        protected PreLollipopWebViewClient(AttachmentResolver attachmentResolver) {
-            super(attachmentResolver);
+        protected PreLollipopWebViewClient(Part part) {
+            super(part);
         }
 
         @Override
@@ -147,8 +153,8 @@ abstract class K9WebViewClient extends WebViewClient {
 
     @TargetApi(VERSION_CODES.LOLLIPOP)
     private static class LollipopWebViewClient extends K9WebViewClient {
-        protected LollipopWebViewClient(AttachmentResolver attachmentResolver) {
-            super(attachmentResolver);
+        protected LollipopWebViewClient(Part part) {
+            super(part);
         }
 
         @Override

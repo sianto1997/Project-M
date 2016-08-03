@@ -28,7 +28,6 @@ import com.fsck.k9.R;
 import com.fsck.k9.controller.MessagingController;
 import com.fsck.k9.controller.MessagingListener;
 import com.fsck.k9.mail.Folder;
-import com.fsck.k9.mailstore.LocalFolder;
 
 
 public class ChooseFolder extends K9ListActivity {
@@ -261,7 +260,7 @@ public class ChooseFolder extends K9ListActivity {
             mHandler.progress(false);
         }
         @Override
-        public void listFolders(Account account, List<LocalFolder> folders) {
+        public void listFolders(Account account, List<? extends Folder> folders) {
             if (!account.equals(mAccount)) {
                 return;
             }
