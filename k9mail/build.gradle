@@ -50,8 +50,8 @@ android {
         targetSdkVersion 23
 
         applicationId "com.pokkitnet.project_m"
-        versionCode 1
-        versionName "0.1.0"
+        versionCode 2
+        versionName "0.1.1"
 
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
