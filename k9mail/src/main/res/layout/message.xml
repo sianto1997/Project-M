@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.fsck.k9.ui.messageview.MessageTopView
+<com.pokkitnet.project_m.ui.messageview.MessageTopView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/message_view"
@@ -9,7 +9,7 @@
     android:layout_weight="1"
     android:background="?attr/messageViewBackgroundColor">
 
-    <com.fsck.k9.view.NonLockingScrollView
+    <com.pokkitnet.project_m.view.NonLockingScrollView
         android:layout_width="fill_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
@@ -44,7 +44,7 @@
 
 	    </LinearLayout>
 
-    </com.fsck.k9.view.NonLockingScrollView>
+    </com.pokkitnet.project_m.view.NonLockingScrollView>
 
     <Button android:id="@+id/download_remainder"
         android:text="@string/message_view_download_remainder"
@@ -52,4 +52,4 @@
         android:visibility="gone"
         android:layout_width="fill_parent"/>
 
-</com.fsck.k9.ui.messageview.MessageTopView>
+</com.pokkitnet.project_m.ui.messageview.MessageTopView>

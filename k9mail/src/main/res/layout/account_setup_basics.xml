@@ -42,13 +42,13 @@
                 android:layout_width="fill_parent"
                 android:text="@string/account_setup_basics_show_password" />
 
-            <com.fsck.k9.view.ClientCertificateSpinner
+            <com.pokkitnet.project_m.view.ClientCertificateSpinner
                 android:id="@+id/account_client_certificate_spinner"
                 android:layout_width="fill_parent"
                 android:layout_height="wrap_content"
                 android:visibility="gone" />
 
-            <com.fsck.k9.view.FoldableLinearLayout
+            <com.pokkitnet.project_m.view.FoldableLinearLayout
                 android:id="@+id/foldable_advanced_options"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -61,7 +61,7 @@
                     android:layout_width="fill_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/account_setup_basics_client_certificate" />
-            </com.fsck.k9.view.FoldableLinearLayout>
+            </com.pokkitnet.project_m.view.FoldableLinearLayout>
 
             <View
                 android:layout_width="fill_parent"

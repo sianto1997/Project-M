@@ -1,11 +1,11 @@
-package com.fsck.k9.helper;
+package com.pokkitnet.project_m.helper;
 
 
 import android.content.Context;
 import android.graphics.Color;
 import android.text.SpannableString;
 
-import com.fsck.k9.mail.Address;
+import com.pokkitnet.project_m.mail.Address;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;

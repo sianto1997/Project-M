@@ -59,7 +59,7 @@
         android:layout_height="wrap_content"
         android:visibility="gone" >
 
-        <com.fsck.k9.view.MessageTitleView
+        <com.pokkitnet.project_m.view.MessageTitleView
             android:id="@+id/message_title_view"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

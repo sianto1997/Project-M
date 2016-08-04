@@ -1,4 +1,4 @@
-package com.fsck.k9.mail.internet;
+package com.pokkitnet.project_m.mail.internet;
 
 
 import java.io.ByteArrayInputStream;
@@ -13,11 +13,11 @@ import org.apache.commons.io.IOUtils;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.fsck.k9.mail.Address;
-import com.fsck.k9.mail.Body;
-import com.fsck.k9.mail.BodyPart;
-import com.fsck.k9.mail.Message.RecipientType;
-import com.fsck.k9.mail.Multipart;
+import com.pokkitnet.project_m.mail.Address;
+import com.pokkitnet.project_m.mail.Body;
+import com.pokkitnet.project_m.mail.BodyPart;
+import com.pokkitnet.project_m.mail.Message.RecipientType;
+import com.pokkitnet.project_m.mail.Multipart;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;

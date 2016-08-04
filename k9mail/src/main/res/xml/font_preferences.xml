@@ -145,7 +145,7 @@
             android:entryValues="@array/font_values"
             android:dialogTitle="@string/font_size_message_view_additional_headers" />
 
-        <com.fsck.k9.activity.setup.SliderPreference
+        <com.pokkitnet.project_m.activity.setup.SliderPreference
             android:persistent="false"
             android:key="message_view_content_font_slider"
             android:title="@string/font_size_message_view_content"

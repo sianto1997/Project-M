@@ -1,7 +1,7 @@
-package com.fsck.k9.message;
+package com.pokkitnet.project_m.message;
 
-import com.fsck.k9.Account.QuoteStyle;
-import com.fsck.k9.mail.internet.TextBody;
+import com.pokkitnet.project_m.Account.QuoteStyle;
+import com.pokkitnet.project_m.mail.internet.TextBody;
 
 import org.junit.Ignore;
 import org.junit.experimental.theories.DataPoints;

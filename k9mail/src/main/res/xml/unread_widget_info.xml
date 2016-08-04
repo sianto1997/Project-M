@@ -4,6 +4,6 @@
     android:previewImage="@drawable/preview_unread_widget"
     android:minHeight="60dp"
     android:minWidth="60dp"
-    android:configure="com.fsck.k9.activity.UnreadWidgetConfiguration"
+    android:configure="com.pokkitnet.project_m.activity.UnreadWidgetConfiguration"
     android:updatePeriodMillis="0">
 </appwidget-provider>

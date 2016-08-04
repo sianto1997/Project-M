@@ -1,4 +1,4 @@
-package com.fsck.k9.mail.filter;
+package com.pokkitnet.project_m.mail.filter;
 
 
 import org.junit.Before;

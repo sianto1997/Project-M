@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.fsck.k9.ui.messageview.OpenPgpHeaderView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.pokkitnet.project_m.ui.messageview.OpenPgpHeaderView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/layout_decrypt_openpgp"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -131,4 +131,4 @@
 
     </LinearLayout>
 
-</com.fsck.k9.ui.messageview.OpenPgpHeaderView>
+</com.pokkitnet.project_m.ui.messageview.OpenPgpHeaderView>

@@ -1,6 +1,6 @@
-package com.fsck.k9.mail.store.imap;
+package com.pokkitnet.project_m.mail.store.imap;
 
-import com.fsck.k9.mail.filter.PeekableInputStream;
+import com.pokkitnet.project_m.mail.filter.PeekableInputStream;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -13,7 +13,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
-import static com.fsck.k9.mail.store.imap.ImapResponseParser.parseCapabilities;
+import static com.pokkitnet.project_m.mail.store.imap.ImapResponseParser.parseCapabilities;
 import static java.util.Arrays.asList;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.fsck.k9.mail.store.imap;
+package com.pokkitnet.project_m.mail.store.imap;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;

@@ -1,13 +1,13 @@
-package com.fsck.k9.mail.store.imap;
+package com.pokkitnet.project_m.mail.store.imap;
 
 
 import java.util.HashMap;
 import java.util.Map;
 
-import com.fsck.k9.mail.AuthType;
-import com.fsck.k9.mail.ConnectionSecurity;
-import com.fsck.k9.mail.ServerSettings;
-import com.fsck.k9.mail.store.RemoteStore;
+import com.pokkitnet.project_m.mail.AuthType;
+import com.pokkitnet.project_m.mail.ConnectionSecurity;
+import com.pokkitnet.project_m.mail.ServerSettings;
+import com.pokkitnet.project_m.mail.store.RemoteStore;
 
 import org.junit.Test;
 

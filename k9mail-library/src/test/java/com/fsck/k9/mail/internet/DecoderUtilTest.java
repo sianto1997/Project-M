@@ -1,4 +1,4 @@
-package com.fsck.k9.mail.internet;
+package com.pokkitnet.project_m.mail.internet;
 
 
 import org.junit.Test;

@@ -1,14 +1,14 @@
-package com.fsck.k9.crypto;
+package com.pokkitnet.project_m.crypto;
 
 
 import java.util.List;
 
-import com.fsck.k9.mail.Part;
-import com.fsck.k9.mail.internet.MimeBodyPart;
-import com.fsck.k9.mail.internet.MimeMessage;
-import com.fsck.k9.mail.internet.MimeMessageHelper;
-import com.fsck.k9.mail.internet.MimeMultipart;
-import com.fsck.k9.mail.internet.TextBody;
+import com.pokkitnet.project_m.mail.Part;
+import com.pokkitnet.project_m.mail.internet.MimeBodyPart;
+import com.pokkitnet.project_m.mail.internet.MimeMessage;
+import com.pokkitnet.project_m.mail.internet.MimeMessageHelper;
+import com.pokkitnet.project_m.mail.internet.MimeMultipart;
+import com.pokkitnet.project_m.mail.internet.TextBody;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
