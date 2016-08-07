@@ -1,0 +1,11 @@
+Version 0.1.0
+New icons
+Different account-, folder-, messagelist layouts
+
+Known bugs:
+Settings subject and sender are switched in font size settings
+Notification title is yellow
+
+
+Previous application: K-9 Mail
+Previous version: 5.106

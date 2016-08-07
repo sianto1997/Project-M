@@ -1,0 +1,27 @@
+launcher icon
+xxxhdpi	= 192
+xxhdpi 	= 144
+xhdpi 	= 96
+hdpi	= 72
+mdpi	= 48
+
+splash screen
+xxxhdpi	= 768
+xxhdpi 	= 576
+xhdpi 	= 384
+hdpi	= 288
+mdpi	= 192
+
+background
+xxxhdpi	= 1440
+xxhdpi 	= 1080
+xhdpi 	= 720
+hdpi	= 540
+mdpi	= 360
+
+navigation icon
+xxxhdpi	= 96
+xxhdpi 	= 72
+xhdpi 	= 48
+hdpi	= 36
+mdpi	= 24
