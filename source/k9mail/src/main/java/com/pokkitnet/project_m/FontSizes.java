@@ -136,7 +136,7 @@ public class FontSizes {
         folderName = FONT_DEFAULT;
         folderStatus = FONT_DEFAULT;
 
-        messageListSubject = FONT_DEFAULT;
+        messageListSubject = FONT_16SP;
         messageListSender = FONT_DEFAULT;
         messageListDate = FONT_DEFAULT;
         messageListPreview = FONT_DEFAULT;

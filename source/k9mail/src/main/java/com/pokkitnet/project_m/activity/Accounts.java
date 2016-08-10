@@ -152,10 +152,10 @@ public class Accounts extends K9ListActivity implements OnItemClickListener {
             mActionBarTitle.setText(getString(R.string.accounts_title));
 
             if (mUnreadMessageCount == 0) {
-                mActionBarUnread.setVisibility(View.GONE);
+                //mActionBarUnread.setVisibility(View.GONE);
             } else {
                 mActionBarUnread.setText(Integer.toString(mUnreadMessageCount));
-                mActionBarUnread.setVisibility(View.VISIBLE);
+                //mActionBarUnread.setVisibility(View.VISIBLE);
             }
 
             String operation = mListener.getOperation(Accounts.this);
@@ -1760,6 +1760,7 @@ public class Accounts extends K9ListActivity implements OnItemClickListener {
                 holder.activeIcons = (RelativeLayout) view.findViewById(R.id.active_icons);
 
                 holder.chip = view.findViewById(R.id.chip);
+                holder.foldersButtonWrapper = (LinearLayout) view.findViewById(R.id.folder_button_wrapper);
                 holder.folders = (ImageButton) view.findViewById(R.id.folders);
                 holder.accountsItemLayout = (LinearLayout)view.findViewById(R.id.accounts_item_layout);
 
@@ -1831,8 +1832,10 @@ public class Accounts extends K9ListActivity implements OnItemClickListener {
             mFontSizes.setViewTextSize(holder.email, mFontSizes.getAccountDescription());
 
             if (account instanceof SearchAccount) {
+                holder.foldersButtonWrapper.setVisibility(View.GONE);
                 holder.folders.setVisibility(View.GONE);
             } else {
+                holder.foldersButtonWrapper.setVisibility(View.VISIBLE);
                 holder.folders.setVisibility(View.VISIBLE);
                 holder.folders.setOnClickListener(new OnClickListener() {
                     public void onClick(View v) {
@@ -1884,6 +1887,7 @@ public class Accounts extends K9ListActivity implements OnItemClickListener {
             public View flaggedMessageCountWrapper;
             public RelativeLayout activeIcons;
             public View chip;
+            public LinearLayout foldersButtonWrapper;
             public ImageButton folders;
             public LinearLayout accountsItemLayout;
         }

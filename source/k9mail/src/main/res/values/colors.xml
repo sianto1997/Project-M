@@ -8,9 +8,10 @@
     <color name="openpgp_blue">#336699</color>
     <color name="openpgp_sidebar">#D8D8D8</color>
     <color name="project_m_yellow">#F9B31C</color>
-    <color name="project_m_dark">#FA9703</color>
+    <color name="project_m_dark">#CD8D04</color>
     <!-- splash screen -->
     <color name="splashScreenColorPrimary">#9E9E9E</color>
     <color name="splashScreenWindowBackground">#ECECEC</color>
 
+    <color name="product_name_black">#000000</color>
 </resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="defaultTheme" parent="android:Theme.Material.Light.NoActionBar" >
+        <item name="android:colorAccent">@color/project_m_yellow</item>
+        <item name="android:colorPrimary">@color/project_m_yellow</item>
+        <item name="android:colorPrimaryDark">@color/project_m_dark</item>
+    </style>
+
+    <color name="project_m_yellow">#F9B31C</color>
+    <color name="project_m_dark">#CD8D04</color>
+</resources>

@@ -1,9 +1,9 @@
 package com.pokkitnet.project_m.activity;
 
-import java.util.Collection;
-import java.util.List;
-
 import android.app.ActionBar;
+import android.app.FragmentManager;
+import android.app.FragmentManager.OnBackStackChangedListener;
+import android.app.FragmentTransaction;
 import android.app.SearchManager;
 import android.content.Context;
 import android.content.Intent;
@@ -12,9 +12,6 @@ import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.app.FragmentManager;
-import android.app.FragmentManager.OnBackStackChangedListener;
-import android.app.FragmentTransaction;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -40,20 +37,23 @@ import com.pokkitnet.project_m.activity.setup.Prefs;
 import com.pokkitnet.project_m.crypto.PgpData;
 import com.pokkitnet.project_m.fragment.MessageListFragment;
 import com.pokkitnet.project_m.fragment.MessageListFragment.MessageListFragmentListener;
-import com.pokkitnet.project_m.ui.messageview.MessageViewFragment;
-import com.pokkitnet.project_m.ui.messageview.MessageViewFragment.MessageViewFragmentListener;
-import com.pokkitnet.project_m.mailstore.StorageManager;
 import com.pokkitnet.project_m.mailstore.LocalMessage;
+import com.pokkitnet.project_m.mailstore.StorageManager;
 import com.pokkitnet.project_m.search.LocalSearch;
 import com.pokkitnet.project_m.search.SearchAccount;
 import com.pokkitnet.project_m.search.SearchSpecification;
 import com.pokkitnet.project_m.search.SearchSpecification.Attribute;
 import com.pokkitnet.project_m.search.SearchSpecification.SearchCondition;
 import com.pokkitnet.project_m.search.SearchSpecification.SearchField;
+import com.pokkitnet.project_m.ui.messageview.MessageViewFragment;
+import com.pokkitnet.project_m.ui.messageview.MessageViewFragment.MessageViewFragmentListener;
 import com.pokkitnet.project_m.view.MessageHeader;
 import com.pokkitnet.project_m.view.MessageTitleView;
 import com.pokkitnet.project_m.view.ViewSwitcher;
 import com.pokkitnet.project_m.view.ViewSwitcher.OnSwitchCompleteListener;
+
+import java.util.Collection;
+import java.util.List;
 
 import de.cketti.library.changelog.ChangeLog;
 
@@ -1109,7 +1109,7 @@ public class MessageList extends K9Activity implements MessageListFragmentListen
                 menu.findItem(R.id.show_folder_list).setVisible(true);
             }
 
-            menu.findItem(R.id.check_mail).setVisible(mMessageListFragment.isCheckMailSupported());
+            //menu.findItem(R.id.check_mail).setVisible(mMessageListFragment.isCheckMailSupported());
 
             // If this is an explicit local search, show the option to search on the server
             if (!mMessageListFragment.isRemoteSearch() &&
@@ -1137,9 +1137,9 @@ public class MessageList extends K9Activity implements MessageListFragmentListen
 
     public void setActionBarUnread(int unread) {
         if (unread == 0) {
-            mActionBarUnread.setVisibility(View.GONE);
+            //mActionBarUnread.setVisibility(View.GONE);
         } else {
-            mActionBarUnread.setVisibility(View.VISIBLE);
+            //mActionBarUnread.setVisibility(View.VISIBLE);
             mActionBarUnread.setText(Integer.toString(unread));
         }
     }
@@ -1369,23 +1369,24 @@ public class MessageList extends K9Activity implements MessageListFragmentListen
         }
     }
 
+    //Disabled for design purposes
     @Override
     public void enableActionBarProgress(boolean enable) {
         if (mMenuButtonCheckMail != null && mMenuButtonCheckMail.isVisible()) {
-            mActionBarProgress.setVisibility(ProgressBar.GONE);
+            //mActionBarProgress.setVisibility(ProgressBar.GONE);
             if (enable) {
-                mMenuButtonCheckMail
-                        .setActionView(mActionButtonIndeterminateProgress);
+                //mMenuButtonCheckMail
+                //        .setActionView(mActionButtonIndeterminateProgress);
             } else {
-                mMenuButtonCheckMail.setActionView(null);
+                //mMenuButtonCheckMail.setActionView(null);
             }
         } else {
             if (mMenuButtonCheckMail != null)
-                mMenuButtonCheckMail.setActionView(null);
+                //mMenuButtonCheckMail.setActionView(null);
             if (enable) {
-                mActionBarProgress.setVisibility(ProgressBar.VISIBLE);
+                //mActionBarProgress.setVisibility(ProgressBar.VISIBLE);
             } else {
-                mActionBarProgress.setVisibility(ProgressBar.GONE);
+                //mActionBarProgress.setVisibility(ProgressBar.GONE);
             }
         }
     }

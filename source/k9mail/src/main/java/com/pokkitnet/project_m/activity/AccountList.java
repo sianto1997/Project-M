@@ -1,8 +1,5 @@
 package com.pokkitnet.project_m.activity;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.View;
@@ -20,6 +17,9 @@ import com.pokkitnet.project_m.K9;
 import com.pokkitnet.project_m.Preferences;
 import com.pokkitnet.project_m.R;
 import com.pokkitnet.project_m.search.SearchAccount;
+
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -115,7 +115,7 @@ public abstract class AccountList extends K9ListActivity implements OnItemClickL
             } else {
                 view = getLayoutInflater().inflate(R.layout.accounts_item, parent, false);
                 view.findViewById(R.id.active_icons).setVisibility(View.GONE);
-                view.findViewById(R.id.folders).setVisibility(View.GONE);
+                view.findViewById(R.id.folder_button_wrapper).setVisibility(View.GONE);
             }
 
             AccountViewHolder holder = (AccountViewHolder) view.getTag();

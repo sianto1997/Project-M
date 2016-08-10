@@ -1,11 +1,5 @@
 package com.pokkitnet.project_m.activity;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Locale;
-
 import android.app.ActionBar;
 import android.content.Context;
 import android.content.Intent;
@@ -51,15 +45,21 @@ import com.pokkitnet.project_m.activity.setup.Prefs;
 import com.pokkitnet.project_m.controller.MessagingController;
 import com.pokkitnet.project_m.controller.MessagingListener;
 import com.pokkitnet.project_m.helper.SizeFormatter;
-import com.pokkitnet.project_m.mail.power.TracingPowerManager;
-import com.pokkitnet.project_m.mail.power.TracingPowerManager.TracingWakeLock;
 import com.pokkitnet.project_m.mail.Folder;
 import com.pokkitnet.project_m.mail.Message;
+import com.pokkitnet.project_m.mail.power.TracingPowerManager;
+import com.pokkitnet.project_m.mail.power.TracingPowerManager.TracingWakeLock;
 import com.pokkitnet.project_m.mailstore.LocalFolder;
 import com.pokkitnet.project_m.search.LocalSearch;
 import com.pokkitnet.project_m.search.SearchSpecification.Attribute;
 import com.pokkitnet.project_m.search.SearchSpecification.SearchField;
 import com.pokkitnet.project_m.service.MailService;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Locale;
 
 import de.cketti.library.changelog.ChangeLog;
 
@@ -106,10 +106,10 @@ public class FolderList extends K9ListActivity {
                     mActionBarTitle.setText(getString(R.string.folders_title));
 
                     if (mUnreadMessageCount == 0) {
-                        mActionBarUnread.setVisibility(View.GONE);
+                        //mActionBarUnread.setVisibility(View.GONE);
                     } else {
                         mActionBarUnread.setText(Integer.toString(mUnreadMessageCount));
-                        mActionBarUnread.setVisibility(View.VISIBLE);
+                       // mActionBarUnread.setVisibility(View.VISIBLE);
                     }
 
                     String operation = mAdapter.mListener.getOperation(FolderList.this);

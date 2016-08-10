@@ -165,7 +165,7 @@ public class K9 extends Application {
      */
     private static boolean sIsDebuggable;
 
-    private static boolean mAnimations = true;
+    private static boolean mAnimations = false;
 
     private static boolean mConfirmDelete = false;
     private static boolean mConfirmDeleteStarred = false;
@@ -215,11 +215,11 @@ public class K9 extends Application {
     }
 
     private static boolean mMessageListCheckboxes = true;
-    private static boolean mMessageListStars = true;
+    private static boolean mMessageListStars = false;
     private static int mMessageListPreviewLines = 2;
 
     private static boolean mShowCorrespondentNames = true;
-    private static boolean mMessageListSenderAboveSubject = false;
+    private static boolean mMessageListSenderAboveSubject = true;
     private static boolean mShowContactName = false;
     private static boolean mChangeContactNameColor = false;
     private static int mContactNameColor = 0xff00008f;
@@ -232,7 +232,7 @@ public class K9 extends Application {
     private static boolean mUseVolumeKeysForNavigation = false;
     private static boolean mUseVolumeKeysForListNavigation = false;
     private static boolean mStartIntegratedInbox = false;
-    private static boolean mMeasureAccounts = true;
+    private static boolean mMeasureAccounts = false;
     private static boolean mCountSearchMessages = true;
     private static boolean mHideSpecialAccounts = false;
     private static boolean mAutofitWidth;
@@ -248,7 +248,8 @@ public class K9 extends Application {
     private static SortType mSortType;
     private static Map<SortType, Boolean> mSortAscending = new HashMap<SortType, Boolean>();
 
-    private static boolean sUseBackgroundAsUnreadIndicator = true;
+    //Don't dim
+    private static boolean sUseBackgroundAsUnreadIndicator = false;
     private static boolean sThreadedViewEnabled = true;
     private static SplitViewMode sSplitViewMode = SplitViewMode.NEVER;
     private static boolean sColorizeMissingContactPictures = true;

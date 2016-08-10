@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <dimen name="button_minWidth">100sp</dimen>
+    <dimen name="logo_font_size">50sp</dimen>
+    <dimen name="logo_default_padding">0dp</dimen>
 </resources>
